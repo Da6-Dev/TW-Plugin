@@ -7,6 +7,7 @@ import java.util.UUID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class PlacedMachineTest {
 
@@ -41,5 +42,45 @@ public class PlacedMachineTest {
                 "Player", "CARVAO", 1L, 0L, 0.0, 1, 1, 1, 0.0, 0L, 0L);
         assertFalse(empty.consumeBatteryCycle());
         assertFalse(empty.consumeLubricantCycle());
+    }
+
+    @Test
+    public void stackAndFuelAdditionsRejectOverflowWithoutChangingState() {
+        PlacedMachine stack = new PlacedMachine("world;1;64;2", UUID.randomUUID(),
+                "Player", "CARVAO", Long.MAX_VALUE, 0L, 0.0);
+        try {
+            stack.addStack(1L);
+            fail("Esperava rejeição de overflow do stack.");
+        } catch (ArithmeticException expected) {
+            assertEquals(Long.MAX_VALUE, stack.getStackAmount());
+        }
+
+        PlacedMachine fuel = new PlacedMachine("world;1;64;2", UUID.randomUUID(),
+                "Player", "CARVAO", 1L, Long.MAX_VALUE, 0.0);
+        try {
+            fuel.addFuel(1L);
+            fail("Esperava rejeição de overflow do combustível.");
+        } catch (ArithmeticException expected) {
+            assertEquals(Long.MAX_VALUE, fuel.getFuel());
+        }
+    }
+
+    @Test
+    public void machineRejectsNonFiniteOrNegativeStoredEarnings() {
+        PlacedMachine machine = new PlacedMachine("world;1;64;2", UUID.randomUUID(),
+                "Player", "CARVAO", 1L, 0L, 0.0);
+        try {
+            machine.addStoredEarnings(Double.NaN);
+            fail("Esperava rejeição de produção inválida.");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(0.0, machine.getStoredEarnings(), 0.0);
+        }
+
+        try {
+            machine.setStoredEarnings(-1.0);
+            fail("Esperava rejeição de armazenamento negativo.");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(0.0, machine.getStoredEarnings(), 0.0);
+        }
     }
 }

@@ -14,6 +14,7 @@ public class PlacedSpawnerTest {
                 "Player", "PIG", 2L);
 
         PlacedSpawner snapshot = spawner.snapshot();
+        spawner.setPendingPhysicalSpawn(150L);
         spawner.addStoredMoney(200.0);
         spawner.addStoredTokens(3L);
         spawner.addStack(1L);
@@ -21,5 +22,7 @@ public class PlacedSpawnerTest {
         assertEquals(0.0, snapshot.getStoredMoney(), 0.0);
         assertEquals(0L, snapshot.getStoredTokens());
         assertEquals(2L, snapshot.getStackAmount());
+        assertEquals(0L, snapshot.getPendingPhysicalSpawn());
+        assertEquals(150L, spawner.snapshot().getPendingPhysicalSpawn());
     }
 }

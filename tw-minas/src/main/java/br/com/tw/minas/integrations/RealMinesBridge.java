@@ -45,4 +45,12 @@ public final class RealMinesBridge {
             throw new IllegalStateException("Falha ao atualizar o reset da mina RealMines.", e);
         }
     }
+
+    public boolean isMineBlock(Block block) {
+        try {
+            return getMineWithBlock.invoke(mineManager, block) != null;
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Falha ao verificar se o bloco pertence a uma mina RealMines.", e);
+        }
+    }
 }

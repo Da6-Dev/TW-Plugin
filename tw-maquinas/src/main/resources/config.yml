@@ -5,6 +5,19 @@ combustivel:
 confirmation:
   price-threshold: 250000.0
 
+machine-rules:
+  plot-world: "terrenos"
+  max-machines-per-plot: 25
+  max-stack-size: 1000000
+  max-fuel-cycles: 10000000
+  max-upgrades:
+    speed: 19
+    storage: 100
+    fuel-efficiency: 20
+
+performance:
+  autosave-seconds: 60
+
 maquinas:
   CARVAO:
     nome: "&8Máquina de Carvão"

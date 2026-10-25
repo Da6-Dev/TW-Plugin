@@ -1,3 +1,5 @@
+config-version: 2
+
 spawners:
   PIG:
     nome: "&dGerador de Porcos"
@@ -43,9 +45,19 @@ spawners:
     chance-token: 0.50
 
 limits:
-  max-spawn-per-cycle: 1000
+  # O limite afeta unidades representadas pelo stack, não entidades Bukkit individuais.
+  max-spawn-per-cycle: 10000
   max-entities-per-spawner: 32
   max-stack-purchase: 1000
+  max-spawner-stack: 1000000
+  max-owned-spawners: 100
+  max-spawners-per-plot: 25
+  plot-world: "terrenos"
+  max-pending-physical: 100000
+  autosave-seconds: 60
+  max-speed-level: 19
+  max-loot-level: 100
+  max-amount-level: 10000
 
 confirmation:
   price-threshold: 250000.0

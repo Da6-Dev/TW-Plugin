@@ -28,6 +28,16 @@ public class PlacedMachine {
 
     // Construtor completo (Usado pelo MachineRepository ao carregar do banco de dados)
     public PlacedMachine(String locationKey, UUID ownerUuid, String ownerName, String typeId, long stackAmount, long fuel, double storedEarnings, int speedLevel, int storageLevel, int fuelEfficiencyLevel, double totalGenerated) {
+        if (locationKey == null || locationKey.trim().isEmpty() || ownerUuid == null
+                || ownerName == null || ownerName.length() > 16 || typeId == null || typeId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Identificação da máquina inválida.");
+        }
+        if (stackAmount < 1L || fuel < 0L || speedLevel < 1 || storageLevel < 1
+                || fuelEfficiencyLevel < 1) {
+            throw new IllegalArgumentException("Os atributos da máquina não podem ser negativos ou nulos.");
+        }
+        requireFiniteNonNegative(storedEarnings, "saldo armazenado");
+        requireFiniteNonNegative(totalGenerated, "produção histórica");
         this.locationKey = locationKey;
         this.ownerUuid = ownerUuid;
         this.ownerName = ownerName;
@@ -64,13 +74,20 @@ public class PlacedMachine {
     public String getOwnerName() { return ownerName; }
     public String getTypeId() { return typeId; }
 
-    public long getStackAmount() { return stackAmount; }
-    public void addStack(long amount) { this.stackAmount += amount; }
+    public synchronized long getStackAmount() { return stackAmount; }
+    public synchronized void addStack(long amount) {
+        if (amount < 1L) throw new IllegalArgumentException("A quantidade de máquinas deve ser positiva.");
+        this.stackAmount = Math.addExact(this.stackAmount, amount);
+    }
     public void removeStack(long amount) { this.stackAmount = Math.max(0, this.stackAmount - amount); }
 
-    public long getFuel() { return fuel; }
-    public void addFuel(long amount) { this.fuel += amount; }
-    public boolean consumeFuel(long amount) {
+    public synchronized long getFuel() { return fuel; }
+    public synchronized void addFuel(long amount) {
+        if (amount < 1L) throw new IllegalArgumentException("A quantidade de combustível deve ser positiva.");
+        this.fuel = Math.addExact(this.fuel, amount);
+    }
+    public synchronized boolean consumeFuel(long amount) {
+        if (amount < 1L) throw new IllegalArgumentException("A quantidade de combustível deve ser positiva.");
         if (this.fuel >= amount) {
             this.fuel -= amount;
             return true;
@@ -78,26 +95,37 @@ public class PlacedMachine {
         return false;
     }
 
-    public double getStoredEarnings() { return storedEarnings; }
-    public void addStoredEarnings(double amount) { this.storedEarnings += amount; }
-    public void setStoredEarnings(double storedEarnings) { this.storedEarnings = storedEarnings; }
+    public synchronized double getStoredEarnings() { return storedEarnings; }
+    public synchronized void addStoredEarnings(double amount) {
+        requireFiniteNonNegative(amount, "produção");
+        this.storedEarnings = requireFiniteNonNegative(this.storedEarnings + amount, "saldo armazenado");
+    }
+    public synchronized void setStoredEarnings(double storedEarnings) {
+        this.storedEarnings = requireFiniteNonNegative(storedEarnings, "saldo armazenado");
+    }
 
-    public long getLastTickEpochSeconds() { return lastTickEpochSeconds; }
-    public void setLastTickEpochSeconds(long lastTickEpochSeconds) { this.lastTickEpochSeconds = lastTickEpochSeconds; }
+    public synchronized long getLastTickEpochSeconds() { return lastTickEpochSeconds; }
+    public synchronized void setLastTickEpochSeconds(long lastTickEpochSeconds) {
+        if (lastTickEpochSeconds < 0L) throw new IllegalArgumentException("O horário do ciclo não pode ser negativo.");
+        this.lastTickEpochSeconds = lastTickEpochSeconds;
+    }
 
     // --- GETTERS E SETTERS DOS UPGRADES ---
 
-    public int getSpeedLevel() { return speedLevel; }
-    public void upgradeSpeedLevel() { this.speedLevel++; }
+    public synchronized int getSpeedLevel() { return speedLevel; }
+    public synchronized void upgradeSpeedLevel() { this.speedLevel = Math.addExact(this.speedLevel, 1); }
 
-    public int getStorageLevel() { return storageLevel; }
-    public void upgradeStorageLevel() { this.storageLevel++; }
+    public synchronized int getStorageLevel() { return storageLevel; }
+    public synchronized void upgradeStorageLevel() { this.storageLevel = Math.addExact(this.storageLevel, 1); }
 
-    public int getFuelEfficiencyLevel() { return fuelEfficiencyLevel; }
-    public void upgradeFuelEfficiencyLevel() { this.fuelEfficiencyLevel++; }
+    public synchronized int getFuelEfficiencyLevel() { return fuelEfficiencyLevel; }
+    public synchronized void upgradeFuelEfficiencyLevel() { this.fuelEfficiencyLevel = Math.addExact(this.fuelEfficiencyLevel, 1); }
 
-    public double getTotalGenerated() { return totalGenerated; }
-    public void addTotalGenerated(double amount) { this.totalGenerated += amount; }
+    public synchronized double getTotalGenerated() { return totalGenerated; }
+    public synchronized void addTotalGenerated(double amount) {
+        requireFiniteNonNegative(amount, "produção histórica");
+        this.totalGenerated = requireFiniteNonNegative(this.totalGenerated + amount, "produção histórica");
+    }
 
     public PlacedMachine(String locationKey, UUID ownerUuid, String ownerName, String typeId,
             long stackAmount, long fuel, double storedEarnings, int speedLevel, int storageLevel,
@@ -136,11 +164,18 @@ public class PlacedMachine {
         return true;
     }
 
-    public PlacedMachine snapshot() {
+    public synchronized PlacedMachine snapshot() {
         PlacedMachine copy = new PlacedMachine(locationKey, ownerUuid, ownerName, typeId, stackAmount, fuel,
                 storedEarnings, speedLevel, storageLevel, fuelEfficiencyLevel, totalGenerated,
                 batteryCycles, lubricantCycles);
         copy.setLastTickEpochSeconds(lastTickEpochSeconds);
         return copy;
+    }
+
+    private static double requireFiniteNonNegative(double amount, String name) {
+        if (!Double.isFinite(amount) || amount < 0.0) {
+            throw new IllegalArgumentException("Valor inválido para " + name + ".");
+        }
+        return amount;
     }
 }

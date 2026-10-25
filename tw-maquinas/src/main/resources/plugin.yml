@@ -2,8 +2,13 @@ name: tw-maquinas
 version: 1.0
 api-version: '26.3'
 main: br.com.tw.maquinas.TWMaquinasPlugin
-depend: [tw-core, tw-economia]
+depend: [tw-core, tw-economia, PlotSquared, WorldEdit]
 commands:
   maquinas:
-    description: Abre a loja e central de maquinas
+    description: Abre a loja ou consulta o diagnóstico das máquinas
     aliases: [maquina]
+    usage: /maquinas [status|jogador <nome>]
+permissions:
+  tw-maquinas.admin:
+    description: Permite consultar estatísticas administrativas das máquinas
+    default: op

@@ -165,6 +165,33 @@ public class UserManager implements Listener {
         }
     }
 
+    public boolean flushUserSync(TWUser user) {
+        if (user == null) return false;
+        TWUserSnapshot snapshot = user.snapshot();
+        Future<Boolean> flush;
+        try {
+            flush = saveExecutor.submit(() -> {
+                try {
+                    repository.saveUser(snapshot);
+                    user.markSaved(snapshot.getVersion());
+                    return true;
+                } catch (IllegalStateException e) {
+                    plugin.getLogger().log(Level.SEVERE,
+                            "Falha ao sincronizar os dados do jogador " + snapshot.getUuid() + ".", e);
+                    return false;
+                }
+            });
+            return flush.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            plugin.getLogger().log(Level.SEVERE, "Interrompido ao sincronizar os dados do jogador.", e);
+            return false;
+        } catch (ExecutionException | java.util.concurrent.RejectedExecutionException e) {
+            plugin.getLogger().log(Level.SEVERE, "Não foi possível sincronizar os dados do jogador.", e);
+            return false;
+        }
+    }
+
     private void enqueueSave(Runnable saveOperation) {
         try {
             saveExecutor.execute(saveOperation);

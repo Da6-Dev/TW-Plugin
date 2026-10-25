@@ -3,7 +3,15 @@ version: 1.0
 api-version: '26.3'
 main: br.com.tw.terrenos.TWTerrenosPlugin
 depend: [tw-core]
+softdepend: [PlotSquared]
 commands:
   terreno:
     description: Abre a agencia de terrenos
-    aliases: [terrenos, plot, p]
+    aliases: [terrenos]
+  terrenosadmin:
+    description: Consulta a auditoria de terrenos
+    permission: tw-terrenos.admin
+permissions:
+  tw-terrenos.admin:
+    description: Administra e audita o sistema de terrenos
+    default: op

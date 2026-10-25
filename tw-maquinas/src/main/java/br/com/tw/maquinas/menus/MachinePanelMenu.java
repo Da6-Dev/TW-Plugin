@@ -3,8 +3,8 @@ package br.com.tw.maquinas.menus;
 import br.com.tw.core.TWCorePlugin;
 import br.com.tw.core.data.TWUser;
 import br.com.tw.core.menus.TWMenu;
+import br.com.tw.core.menus.TWConfirmationMenu;
 import br.com.tw.core.utils.TWFormat;
-import br.com.tw.core.utils.TWMenuFrame;
 import br.com.tw.economia.TWEconomiaPlugin;
 import br.com.tw.maquinas.TWMaquinasPlugin;
 import br.com.tw.maquinas.managers.MachineManager;
@@ -18,9 +18,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.Arrays;
+import java.util.OptionalDouble;
 
 public class MachinePanelMenu implements TWMenu {
 
@@ -36,110 +35,101 @@ public class MachinePanelMenu implements TWMenu {
         this.manager = TWMaquinasPlugin.getInstance().getMachineManager();
         this.type = manager.getMachineTypes().get(machine.getTypeId());
 
-        this.inventory = Bukkit.createInventory(this, 45, ChatColor.DARK_GRAY + "Painel da Máquina");
+        this.inventory = Bukkit.createInventory(this, 54, ChatColor.DARK_GRAY + "TW | Painel da Máquina");
         setupItems();
     }
 
     private void setupItems() {
-        for (int i = 0; i < 45; i++) {
-            ItemStack glass = TWMenuFrame.stainedGlassPane(15);
-            inventory.setItem(i, glass);
-        }
-        TWMenuFrame.apply(inventory);
-
+        inventory.clear();
+        MachineMenuStyle.frame(inventory, Material.LIGHT_BLUE_STAINED_GLASS_PANE);
         if (type == null) return;
 
         TWUser user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
-        if (user == null) return;
+        double maxStorage = manager.getStorageCapacity(machine, type);
+        boolean isOwner = machine.getOwnerUuid().equals(player.getUniqueId());
+        double multiplier = 1.0;
+        if (isOwner && user != null) {
+            multiplier = manager.getPrestigeMultiplier(user.getPrestigeId())
+                    * TWEconomiaPlugin.getInstance().getGlobalBooster();
+        }
 
-        double maxStorage = (type.getValuePerCycle() * machine.getStackAmount()) * (10 * machine.getStorageLevel());
-        double prestigeMult = manager.getPrestigeMultiplier(user.getPrestigeId());
-        double globalBooster = TWEconomiaPlugin.getInstance().getGlobalBooster();
-        double currentPayout = machine.getStoredEarnings() * prestigeMult * globalBooster;
-
-        ItemStack info = new ItemStack(type.getMaterial());
-        ItemMeta iMeta = info.getItemMeta();
-        iMeta.setDisplayName(type.getDisplayName());
-        iMeta.setLore(Arrays.asList(
+        inventory.setItem(4, MachineMenuStyle.button(Material.NETHER_STAR,
+                "§b§lTW NETWORK §8» §f" + type.getDisplayName(),
                 "§7Dono: §f" + machine.getOwnerName(),
-                "§7Stack Agrupado: §e" + machine.getStackAmount() + "x",
-                "§7Combustível Restante: §c" + machine.getFuel() + " ciclos",
-                "§7Armazenamento: §a" + TWFormat.formatarDinheiro(machine.getStoredEarnings()) + " §8/ §2" + TWFormat.formatarDinheiro(maxStorage),
-                "§7Total Gerado (Histórico): §6$" + TWFormat.formatarDinheiro(machine.getTotalGenerated())
-        ));
-        info.setItemMeta(iMeta);
-        inventory.setItem(13, info);
+                "§7Máquinas neste stack: §e" + machine.getStackAmount() + "x",
+                "§7Saldo: §a$" + TWFormat.formatarDinheiro(user == null ? 0.0 : user.getBalance())));
+        inventory.setItem(13, MachineMenuStyle.button(type.getMaterial(), "§f§lEstado da máquina",
+                "§7Combustível: §e" + machine.getFuel() + " ciclos",
+                "§7Bateria: §b" + machine.getBatteryCycles() + " ciclos",
+                "§7Lubrificante: §a" + machine.getLubricantCycles() + " ciclos",
+                "§7Armazenado: §a$" + TWFormat.formatarDinheiro(machine.getStoredEarnings())
+                        + " §8/ §2$" + TWFormat.formatarDinheiro(maxStorage),
+                "§7Produção histórica: §6$" + TWFormat.formatarDinheiro(machine.getTotalGenerated()),
+                "§8Produz apenas com o chunk carregado."));
 
-        long speedCost = machine.getSpeedLevel() * 1000L;
-        ItemStack speedUp = new ItemStack(Material.SUGAR);
-        ItemMeta sMeta = speedUp.getItemMeta();
-        sMeta.setDisplayName("§b§lUpgrade: Velocidade");
-        sMeta.setLore(Arrays.asList(
-                "§7Reduz o tempo de cada ciclo em §a0.5s§7.",
-                "§7Nível Atual: §f" + machine.getSpeedLevel(),
-                "§7Custo: §b" + TWFormat.formatarDinheiro(speedCost) + " Tokens",
-                "",
-                "§eClica para evoluir a Velocidade!"
-        ));
-        speedUp.setItemMeta(sMeta);
-        inventory.setItem(29, speedUp);
+        double payout = machine.getStoredEarnings() * multiplier;
+        inventory.setItem(20, isOwner
+                ? MachineMenuStyle.button(Material.GOLD_INGOT, "§a§lRECOLHER PRODUÇÃO",
+                        "§7Saldo guardado: §e$" + TWFormat.formatarDinheiro(machine.getStoredEarnings()),
+                        "§7Multiplicador: §b" + String.format(java.util.Locale.US, "%.2f", multiplier) + "x",
+                        "§7Você recebe: §2$" + TWFormat.formatarDinheiro(payout),
+                        "",
+                        "§eClique para recolher")
+                : MachineMenuStyle.button(Material.BARRIER, "§c§lSAQUE DO DONO",
+                        "§7Somente o proprietário pode receber",
+                        "§7o saldo desta máquina."));
 
-        long storageCost = machine.getStorageLevel() * 800L;
-        ItemStack storageUp = new ItemStack(Material.CHEST);
-        ItemMeta stMeta = storageUp.getItemMeta();
-        stMeta.setDisplayName("§6§lUpgrade: Armazenamento");
-        stMeta.setLore(Arrays.asList(
-                "§7Aumenta o limite de lucro acumulado.",
-                "§7Nível Atual: §f" + machine.getStorageLevel(),
-                "§7Custo: §b" + TWFormat.formatarDinheiro(storageCost) + " Tokens",
+        long speedCost = upgradeCost(machine.getSpeedLevel(), 1000L);
+        inventory.setItem(29, MachineMenuStyle.button(
+                manager.canUpgradeSpeed(machine) ? Material.SUGAR : Material.BARRIER,
+                "§b§lVelocidade §8[" + machine.getSpeedLevel() + "/" + manager.getMaxSpeedLevel(machine) + "]",
+                "§7Reduz o intervalo em §a0,5s§7 por nível.",
+                manager.canUpgradeSpeed(machine)
+                        ? "§7Próximo nível: §f" + (machine.getSpeedLevel() + 1)
+                        : "§cNível máximo atingido",
+                manager.canUpgradeSpeed(machine) ? "§7Custo: §b" + speedCost + " Tokens" : "",
                 "",
-                "§eClica para evoluir o Armazenamento!"
-        ));
-        storageUp.setItemMeta(stMeta);
-        inventory.setItem(31, storageUp);
+                manager.canUpgradeSpeed(machine) ? "§eClique para melhorar" : "§8Sem mais benefício"));
 
-        long fuelEffCost = machine.getFuelEfficiencyLevel() * 500L;
-        ItemStack fuelUp = new ItemStack(Material.COAL);
-        ItemMeta fMeta = fuelUp.getItemMeta();
-        fMeta.setDisplayName("§8§lUpgrade: Eficiência de Combustível");
-        fMeta.setLore(Arrays.asList(
-                "§7Garante §a+5%§7 de chance por nível",
-                "§7de não gastar combustível num ciclo.",
-                "§7Nível Atual: §f" + machine.getFuelEfficiencyLevel(),
-                "§7Custo: §b" + TWFormat.formatarDinheiro(fuelEffCost) + " Tokens",
+        long storageCost = upgradeCost(machine.getStorageLevel(), 800L);
+        inventory.setItem(31, MachineMenuStyle.button(
+                manager.canUpgradeStorage(machine) ? Material.CHEST : Material.BARRIER,
+                "§6§lArmazenamento §8[" + machine.getStorageLevel() + "/" + manager.getMaxStorageLevel() + "]",
+                "§7Aumenta o espaço de armazenamento.",
+                manager.canUpgradeStorage(machine)
+                        ? "§7Custo: §b" + storageCost + " Tokens"
+                        : "§cNível máximo atingido",
                 "",
-                "§eClica para evoluir o Combustível!"
-        ));
-        fuelUp.setItemMeta(fMeta);
-        inventory.setItem(33, fuelUp);
+                manager.canUpgradeStorage(machine) ? "§eClique para melhorar" : "§8Sem mais benefício"));
 
-        ItemStack collect = new ItemStack(Material.GOLD_INGOT);
-        ItemMeta cMeta = collect.getItemMeta();
-        cMeta.setDisplayName("§a§lRecolher Produção");
-        cMeta.setLore(Arrays.asList(
-                "§7Valor Acumulado Base: §a$" + TWFormat.formatarDinheiro(machine.getStoredEarnings()),
-                "§7Bónus Atual (Rank/Global): §e" + (prestigeMult * globalBooster) + "x",
-                "§7Total a Receber: §2§l$" + TWFormat.formatarDinheiro(currentPayout),
+        long fuelCost = upgradeCost(machine.getFuelEfficiencyLevel(), 500L);
+        inventory.setItem(33, MachineMenuStyle.button(
+                manager.canUpgradeFuelEfficiency(machine) ? Material.COAL : Material.BARRIER,
+                "§8§lEficiência §8[" + machine.getFuelEfficiencyLevel() + "/"
+                        + manager.getMaxFuelEfficiencyLevel() + "]",
+                "§7Chance de economizar combustível: §a"
+                        + ((machine.getFuelEfficiencyLevel() - 1) * 5) + "%",
+                manager.canUpgradeFuelEfficiency(machine)
+                        ? "§7Custo: §b" + fuelCost + " Tokens"
+                        : "§cNível máximo atingido",
                 "",
-                "§eClica para transferir para a tua conta!"
-        ));
-        collect.setItemMeta(cMeta);
-        inventory.setItem(11, collect);
+                manager.canUpgradeFuelEfficiency(machine) ? "§eClique para melhorar" : "§8Sem mais benefício"));
 
-        ItemStack pickup = new ItemStack(Material.HOPPER);
-        ItemMeta pMeta = pickup.getItemMeta();
-        pMeta.setDisplayName("§c§lDesmontar Máquina");
-        pMeta.setLore(Arrays.asList(
-                "§7Guarda o bloco da máquina (" + machine.getStackAmount() + "x)",
-                "§7de volta no teu inventário.",
+        inventory.setItem(40, MachineMenuStyle.button(Material.BOOK,
+                "§f§lInformações e limites",
+                "§7Capacidade atual: §a$" + TWFormat.formatarDinheiro(maxStorage),
+                "§7Stack máximo: §e" + machine.getStackAmount() + "x",
+                "§7Recolha os lucros antes de desmontar."));
+
+        inventory.setItem(49, MachineMenuStyle.button(Material.HOPPER, "§c§lDESMONTAR MÁQUINA",
+                "§7Devolve o item com §e" + machine.getStackAmount() + "x§7.",
+                "§cO saldo armazenado não é pago no desmonte.",
                 "",
-                "§c§lAtenção: §7Recolhe primeiro os lucros,",
-                "§7ou serás penalizado ao desmontar!",
-                "",
-                "§4Clica para recolher."
-        ));
-        pickup.setItemMeta(pMeta);
-        inventory.setItem(40, pickup);
+                "§eClique para recolher a máquina"));
+    }
+
+    private long upgradeCost(int level, long multiplier) {
+        return Math.multiplyExact((long) level, multiplier);
     }
 
     @Override
@@ -152,9 +142,13 @@ public class MachinePanelMenu implements TWMenu {
         TWUser user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
         if (user == null) return;
 
-        int slot = event.getSlot();
+        int slot = event.getRawSlot();
 
-        if (slot == 11) {
+        if (slot == 20) {
+            if (!machine.getOwnerUuid().equals(player.getUniqueId())) {
+                player.sendMessage(ChatColor.RED + "Somente o proprietário pode recolher os lucros desta máquina.");
+                return;
+            }
             double baseStored = machine.getStoredEarnings();
             if (baseStored <= 0) {
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
@@ -165,79 +159,130 @@ public class MachinePanelMenu implements TWMenu {
             double prestigeMult = manager.getPrestigeMultiplier(user.getPrestigeId());
             double globalBooster = TWEconomiaPlugin.getInstance().getGlobalBooster();
             double finalPayout = baseStored * prestigeMult * globalBooster;
-
-            machine.setStoredEarnings(0);
-            manager.saveMachineAsync(machine);
-            TWMaquinasPlugin.getInstance().getHologramManager().updateOrCreateHologram(machine, type);
-
-            user.addBalance(finalPayout);
-            TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
-
-            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.5f);
-
-            try {
-                Class<?> actionClass = Class.forName("br.com.tw.minas.utils.ActionBarUtil");
-                actionClass.getMethod("send", Player.class, String.class)
-                        .invoke(null, player, "§a✔ Recolheste §2$" + TWFormat.formatarDinheiro(finalPayout) + " §ada máquina!");
-            } catch (Exception e) {
-                player.sendMessage("§a✔ Recolheste §2$" + TWFormat.formatarDinheiro(finalPayout) + " §ada máquina!");
-            }
-
-            setupItems();
-        }
-        else if (slot == 29) {
-            long cost = machine.getSpeedLevel() * 1000L;
-            if (user.removeTokens(cost)) {
-                machine.upgradeSpeedLevel();
-                processUpgrade(user);
-            } else {
-                sendTokenError(cost);
-            }
-        }
-        else if (slot == 31) {
-            long cost = machine.getStorageLevel() * 800L;
-            if (user.removeTokens(cost)) {
-                machine.upgradeStorageLevel();
-                processUpgrade(user);
-            } else {
-                sendTokenError(cost);
-            }
-        }
-        else if (slot == 33) {
-            long cost = machine.getFuelEfficiencyLevel() * 500L;
-            if (user.removeTokens(cost)) {
-                machine.upgradeFuelEfficiencyLevel();
-                processUpgrade(user);
-            } else {
-                sendTokenError(cost);
-            }
-        }
-        else if (slot == 40) {
-            if (player.getInventory().firstEmpty() == -1) {
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-                player.sendMessage(ChatColor.RED + "O teu inventário está cheio!");
+            if (!Double.isFinite(finalPayout) || finalPayout <= 0.0) {
+                player.sendMessage(ChatColor.RED + "O pagamento está indisponível; nenhum saldo foi removido da máquina.");
                 return;
             }
 
-            player.closeInventory();
-            player.getInventory().addItem(manager.createMachineItem(type, machine.getStackAmount()));
+            OptionalDouble updatedBalance;
+            try {
+                updatedBalance = manager.collectEarnings(machine, user, finalPayout);
+            } catch (IllegalStateException e) {
+                TWMaquinasPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                        "Falha ao recolher a produção em " + machine.getLocationKey() + ".", e);
+                player.sendMessage(ChatColor.RED + "Não foi possível recolher os lucros. Tenta novamente mais tarde.");
+                return;
+            }
+            if (!updatedBalance.isPresent()) {
+                player.sendMessage(ChatColor.RED + "O saldo desta máquina mudou; fecha e abre o painel novamente.");
+                return;
+            }
 
-            TWMaquinasPlugin.getInstance().getHologramManager().removeHologram(machine.getLocationKey());
-            org.bukkit.Location loc = machine.getBukkitLocation();
-            if (loc != null) loc.getBlock().setType(Material.AIR);
-
-            manager.removeMachine(loc);
-
-            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1f);
-            player.sendMessage(ChatColor.YELLOW + "Desmontaste a máquina com sucesso!");
+            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.5f);
+            player.sendMessage("§a✔ Recolheste §2$" + TWFormat.formatarDinheiro(finalPayout) + " §ada máquina!");
+            setupItems();
+        }
+        else if (slot == 29) {
+            if (!manager.canUpgradeSpeed(machine)) {
+                player.sendMessage(ChatColor.RED + "Esta máquina já atingiu a velocidade máxima útil.");
+                return;
+            }
+            long cost = upgradeCost(machine.getSpeedLevel(), 1000L);
+            performUpgrade(user, "speed", cost);
+        }
+        else if (slot == 31) {
+            if (!manager.canUpgradeStorage(machine)) {
+                player.sendMessage(ChatColor.RED + "Esta máquina já atingiu o armazenamento máximo.");
+                return;
+            }
+            long cost = upgradeCost(machine.getStorageLevel(), 800L);
+            performUpgrade(user, "storage", cost);
+        }
+        else if (slot == 33) {
+            if (!manager.canUpgradeFuelEfficiency(machine)) {
+                player.sendMessage(ChatColor.RED + "Esta máquina já atingiu a eficiência máxima.");
+                return;
+            }
+            long cost = upgradeCost(machine.getFuelEfficiencyLevel(), 500L);
+            performUpgrade(user, "fuel-efficiency", cost);
+        }
+        else if (slot == 49) {
+            if (!machine.getOwnerUuid().equals(player.getUniqueId())) {
+                player.sendMessage(ChatColor.RED + "Somente o proprietário pode desmontar esta máquina.");
+                return;
+            }
+            if (machine.getStoredEarnings() > 0.0) {
+                player.sendMessage(ChatColor.RED + "Recolhe os lucros antes de desmontar; o saldo armazenado não é devolvido.");
+                return;
+            }
+            new TWConfirmationMenu(player,
+                    "Desmontar " + machine.getStackAmount() + "x " + type.getDisplayName() + "?",
+                    this::dismantleMachine).open();
         }
     }
 
-    private void processUpgrade(TWUser user) {
-        manager.saveMachineAsync(machine);
-        TWMaquinasPlugin.getInstance().getHologramManager().updateOrCreateHologram(machine, type);
-        TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
+    private void dismantleMachine() {
+        org.bukkit.Location loc = machine.getBukkitLocation();
+        if (loc == null) {
+            player.sendMessage(ChatColor.RED + "O mundo da máquina não está carregado; desmontagem cancelada.");
+            return;
+        }
 
+        ItemStack returnedMachine = manager.createMachineItem(type, machine.getStackAmount());
+        ItemStack[] previousContents = snapshotInventoryContents();
+        java.util.Map<Integer, ItemStack> leftovers = player.getInventory().addItem(returnedMachine);
+        if (!leftovers.isEmpty()) {
+            player.getInventory().setContents(previousContents);
+            player.sendMessage(ChatColor.RED + "Libera espaço no inventário para desmontar a máquina.");
+            return;
+        }
+
+        boolean removed;
+        try {
+            removed = manager.removeMachine(loc);
+        } catch (IllegalStateException e) {
+            player.getInventory().setContents(previousContents);
+            TWMaquinasPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                    "Falha ao desmontar a máquina em " + machine.getLocationKey() + ".", e);
+            player.sendMessage(ChatColor.RED + "Não foi possível desmontar a máquina. Tenta novamente mais tarde.");
+            return;
+        }
+        if (!removed) {
+            player.getInventory().setContents(previousContents);
+            player.sendMessage(ChatColor.RED + "Esta máquina já foi removida ou os dados mudaram.");
+            return;
+        }
+
+        player.closeInventory();
+        TWMaquinasPlugin.getInstance().getHologramManager().removeHologram(machine.getLocationKey());
+        loc.getBlock().setType(Material.AIR);
+
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1f);
+        player.sendMessage(ChatColor.YELLOW + "Desmontaste a máquina com sucesso!");
+    }
+
+    private ItemStack[] snapshotInventoryContents() {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            if (contents[slot] != null) contents[slot] = contents[slot].clone();
+        }
+        return contents;
+    }
+
+    private void performUpgrade(TWUser user, String upgrade, long cost) {
+        boolean upgraded;
+        try {
+            upgraded = manager.upgradeMachine(machine, user, upgrade, cost);
+        } catch (IllegalStateException e) {
+            TWMaquinasPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                    "Falha ao evoluir a máquina em " + machine.getLocationKey() + ".", e);
+            player.sendMessage(ChatColor.RED + "Não foi possível concluir a melhoria. Tenta novamente.");
+            return;
+        }
+        if (!upgraded) {
+            sendTokenError(cost);
+            return;
+        }
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1f, 1.5f);
         player.sendMessage(ChatColor.GREEN + "Atributo da máquina evoluído com sucesso!");
         setupItems();

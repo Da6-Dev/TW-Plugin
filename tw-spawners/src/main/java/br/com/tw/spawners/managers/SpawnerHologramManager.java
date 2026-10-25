@@ -35,6 +35,15 @@ public class SpawnerHologramManager {
 
         String modeString = spawner.isVirtualMode() ? (spawner.isAutoSell() ? "§b[AUTO-SELL]" : "§d[VIRTUAL]") : "§e[FÍSICO]";
         lines.add("§7Stack: §e" + spawner.getStackAmount() + "x §8| " + modeString);
+        long generatedPerCycle = br.com.tw.spawners.managers.SpawnerSpawnMath.amount(
+                spawner.getStackAmount(), spawner.getAmountLevel(),
+                TWSpawnersPlugin.getInstance().getSpawnerManager().getMaxSpawnPerCycle());
+        lines.add("§7Geração/ciclo: §e" + generatedPerCycle + "§8/§e"
+                + TWSpawnersPlugin.getInstance().getSpawnerManager().getMaxSpawnPerCycle());
+        if (!spawner.isVirtualMode() && spawner.getPendingPhysicalSpawn() > 0L) {
+            lines.add("§7Mobs físicos pendentes: §b" + spawner.getPendingPhysicalSpawn()
+                    + "§8/§b" + TWSpawnersPlugin.getInstance().getSpawnerManager().getMaxPendingPhysical());
+        }
 
         if (spawner.hasActiveBooster()) {
             lines.add("§b🔥 BOOSTER ATIVO (" + spawner.getBoosterMultiplier() + "x) 🔥");

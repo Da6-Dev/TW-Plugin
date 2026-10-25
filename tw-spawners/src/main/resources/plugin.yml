@@ -2,8 +2,13 @@ name: tw-spawners
 version: 1.0
 api-version: '26.3'
 main: br.com.tw.spawners.TWSpawnersPlugin
-depend: [tw-core, tw-economia]
+depend: [tw-core, tw-economia, PlotSquared]
+softdepend: [WorldEdit, FastAsyncWorldEdit]
 commands:
   spawners:
     description: Abre a loja de geradores de monstros
     aliases: [spawner, geradores]
+permissions:
+  tw-spawners.admin:
+    description: Permite consultar estatísticas dos spawners
+    default: op

@@ -4,7 +4,10 @@ events:
   happy-hour-multiplier: 2.0
   gift-chance: 0.003
   gift-lifetime-seconds: 12
-  meteorite-chance: 0.0004
-  meteorite-health: 30
+  meteorite-chance: 0.00005
+  meteorite-health: 300
+  meteorite-hit-reward-min: 50
+  meteorite-hit-reward-max: 100
+  meteorite-completion-reward: 5000
   actionbar-update-ticks: 20
   cleanup-interval-ticks: 20

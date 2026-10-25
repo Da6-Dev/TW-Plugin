@@ -31,6 +31,8 @@ public class SpawnerShopMenu implements TWMenu {
     private final TWUser user;
     private final SpawnerManager manager;
     private final Map<Integer, SpawnerType> slotMap = new HashMap<>();
+    private static final int[] SPAWNER_SLOTS = {10, 11, 12, 13, 14, 15, 16};
+    private int page;
 
     public SpawnerShopMenu(Player player) {
         this.player = player;
@@ -45,12 +47,15 @@ public class SpawnerShopMenu implements TWMenu {
             inventory.setItem(i, createGlass(15));
         }
 
-        int[] slots = {10, 11, 12, 13, 14, 15, 16};
-        int idx = 0;
-
-        for (SpawnerType type : manager.getSpawnerTypes().values()) {
-            if (idx >= slots.length) break;
-            int slot = slots[idx++];
+        slotMap.clear();
+        java.util.List<SpawnerType> types = new java.util.ArrayList<>(manager.getSpawnerTypes().values());
+        int pageCount = Math.max(1, (types.size() + SPAWNER_SLOTS.length - 1) / SPAWNER_SLOTS.length);
+        if (page >= pageCount) page = pageCount - 1;
+        int start = page * SPAWNER_SLOTS.length;
+        int end = Math.min(types.size(), start + SPAWNER_SLOTS.length);
+        for (int idx = start; idx < end; idx++) {
+            SpawnerType type = types.get(idx);
+            int slot = SPAWNER_SLOTS[idx - start];
             slotMap.put(slot, type);
 
             boolean unlocked = user != null && manager.hasRequiredRank(user.getRankId(), user.getPrestigeId(), type.getRequiredRank());
@@ -72,7 +77,29 @@ public class SpawnerShopMenu implements TWMenu {
         inventory.setItem(38, createBoosterButton("§bBooster Menor §7(1.5x)", 1.5, 30, 250000.0));
         inventory.setItem(40, createBoosterButton("§aBooster Médio §7(2.0x)", 2.0, 60, 1000000.0));
         inventory.setItem(42, createBoosterButton("§dBooster Divino §7(3.0x)", 3.0, 60, 5000000.0));
+        inventory.setItem(4, createInfoButton(page, pageCount));
+        if (page > 0) inventory.setItem(45, createNavigationButton("§ePágina anterior"));
+        if (page + 1 < pageCount) inventory.setItem(53, createNavigationButton("§ePróxima página"));
+        if (pageCount > 1) inventory.setItem(49, createNavigationButton("§fPágina §e" + (page + 1) + "§7/§e" + pageCount));
         TWMenuFrame.apply(inventory);
+    }
+
+    private ItemStack createInfoButton(int currentPage, int pageCount) {
+        ItemStack item = new ItemStack(Material.BOOK);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName("§b§lTW NETWORK §8» §fLoja de Spawners");
+        meta.setLore(Arrays.asList("§7Compra geradores e boosters.", "§7Stack colocado por item: até §e"
+                + manager.getMaxSpawnerStack(), "§7Página §e" + (currentPage + 1) + "§7/§e" + pageCount));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createNavigationButton(String title) {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(title);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private ItemStack createBoosterButton(String name, double mult, int mins, double price) {
@@ -98,7 +125,21 @@ public class SpawnerShopMenu implements TWMenu {
     @Override
     public void onClick(InventoryClickEvent event) {
         if (user == null) return;
-        int slot = event.getSlot();
+        int slot = event.getRawSlot();
+        if (slot == 45 && page > 0) {
+            page--;
+            setupItems();
+            return;
+        }
+        if (slot == 53) {
+            int pageCount = Math.max(1,
+                    (manager.getSpawnerTypes().size() + SPAWNER_SLOTS.length - 1) / SPAWNER_SLOTS.length);
+            if (page + 1 < pageCount) {
+                page++;
+                setupItems();
+            }
+            return;
+        }
 
         if (slot == 38) confirmPurchase(250000.0, "Comprar booster 1.5x", () -> buyBooster(1.5, 30, 250000.0));
         if (slot == 40) confirmPurchase(1000000.0, "Comprar booster 2x", () -> buyBooster(2.0, 60, 1000000.0));
@@ -132,22 +173,36 @@ public class SpawnerShopMenu implements TWMenu {
     }
 
     private void purchaseSpawner(SpawnerType type, long amount, double price) {
-        if (user.removeBalance(price)) {
-            java.util.Map<Integer, ItemStack> leftovers =
-                    player.getInventory().addItem(manager.createSpawnerItem(type, amount));
-            if (!leftovers.isEmpty()) {
-                user.addBalance(price);
-                TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
-                player.sendMessage(ChatColor.RED + "O inventário encheu durante a confirmação; a compra foi cancelada e o saldo devolvido.");
-                return;
-            }
-            TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.5f);
-            player.sendMessage(ChatColor.GREEN + "Compraste " + amount + "x " + type.getDisplayName()
-                    + ChatColor.GREEN + " por $" + TWFormat.formatarDinheiro(price) + "!");
-        } else {
+        if (!user.removeBalance(price)) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             player.sendMessage(ChatColor.RED + "Faltam $" + TWFormat.formatarDinheiro(price - user.getBalance()) + ".");
+            return;
+        }
+        if (!TWCorePlugin.getInstance().getUserManager().flushUserSync(user)) {
+            refund(price, "compra de spawner");
+            player.sendMessage(ChatColor.RED + "Compra cancelada: o saldo não pôde ser persistido.");
+            return;
+        }
+        ItemStack[] previous = snapshotInventoryContents();
+        java.util.Map<Integer, ItemStack> leftovers =
+                player.getInventory().addItem(manager.createSpawnerItem(type, amount));
+        if (!leftovers.isEmpty()) {
+            player.getInventory().setContents(previous);
+            refund(price, "compra de spawner com inventário cheio");
+            player.sendMessage(ChatColor.RED + "Inventário cheio; a compra foi cancelada e o saldo devolvido.");
+            return;
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.5f);
+        player.sendMessage(ChatColor.GREEN + "Compraste " + amount + "x " + type.getDisplayName()
+                + ChatColor.GREEN + " por $" + TWFormat.formatarDinheiro(price) + "!");
+    }
+
+    private void refund(double amount, String reason) {
+        user.addBalance(amount);
+        if (!TWCorePlugin.getInstance().getUserManager().flushUserSync(user)) {
+            TWSpawnersPlugin.getInstance().getLogger().severe(
+                    "Falha ao persistir o reembolso de " + reason + " para " + player.getUniqueId() + ".");
+            player.sendMessage(ChatColor.RED + "O reembolso precisa de assistência da equipe; não saias do servidor.");
         }
     }
 
@@ -166,20 +221,35 @@ public class SpawnerShopMenu implements TWMenu {
     }
 
     private void buyBooster(double mult, int mins, double price) {
-        if (player.getInventory().firstEmpty() == -1) {
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-            player.sendMessage(ChatColor.RED + "Inventário cheio!");
-            return;
-        }
-        if (user.removeBalance(price)) {
-            TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
-            player.getInventory().addItem(manager.createBoosterItem(mult, mins));
-            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
-            player.sendMessage(ChatColor.GREEN + "Booster comprado com sucesso!");
-        } else {
+        if (!user.removeBalance(price)) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             player.sendMessage(ChatColor.RED + "Saldo insuficiente!");
+            return;
         }
+        if (!TWCorePlugin.getInstance().getUserManager().flushUserSync(user)) {
+            refund(price, "compra de booster");
+            player.sendMessage(ChatColor.RED + "Compra cancelada: o saldo não pôde ser persistido.");
+            return;
+        }
+        ItemStack[] previous = snapshotInventoryContents();
+        java.util.Map<Integer, ItemStack> leftovers =
+                player.getInventory().addItem(manager.createBoosterItem(mult, mins));
+        if (!leftovers.isEmpty()) {
+            player.getInventory().setContents(previous);
+            refund(price, "compra de booster com inventário cheio");
+            player.sendMessage(ChatColor.RED + "Inventário cheio; a compra foi cancelada e o saldo devolvido.");
+            return;
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
+        player.sendMessage(ChatColor.GREEN + "Booster comprado com sucesso!");
+    }
+
+    private ItemStack[] snapshotInventoryContents() {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            if (contents[slot] != null) contents[slot] = contents[slot].clone();
+        }
+        return contents;
     }
 
     @Override

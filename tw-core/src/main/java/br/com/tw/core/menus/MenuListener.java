@@ -3,6 +3,7 @@ package br.com.tw.core.menus;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 
 public class MenuListener implements Listener {
@@ -15,11 +16,25 @@ public class MenuListener implements Listener {
         if (inv != null && inv.getHolder() instanceof TWMenu) {
             event.setCancelled(true); // Bloqueia pegar o item
 
-            if (event.getCurrentItem() == null) return;
+            int rawSlot = event.getRawSlot();
+            if (rawSlot < 0 || rawSlot >= inv.getSize() || event.getCurrentItem() == null) return;
 
             // Passa a responsabilidade do clique para a própria classe do menu
             TWMenu menu = (TWMenu) inv.getHolder();
             menu.onClick(event);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        Inventory inventory = event.getView().getTopInventory();
+        if (!(inventory.getHolder() instanceof TWMenu)) return;
+
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot < inventory.getSize()) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 }

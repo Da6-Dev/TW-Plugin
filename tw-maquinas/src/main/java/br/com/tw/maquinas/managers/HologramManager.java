@@ -45,19 +45,21 @@ public class HologramManager {
         }
         lines.add("§7Progresso: " + progress.toString());
 
-        double maxStorage = (type.getValuePerCycle() * machine.getStackAmount()) * (10 * machine.getStorageLevel());
+        double maxStorage = TWMaquinasPlugin.getInstance().getMachineManager()
+                .getStorageCapacity(machine, type);
         lines.add("§7Armazenado: §2$" + TWFormat.formatarDinheiro(machine.getStoredEarnings()) + " §8/ §a$" + TWFormat.formatarDinheiro(maxStorage));
 
         if (machine.getTotalGenerated() > 0) {
             lines.add("§7Total Histórico: §6$" + TWFormat.formatarDinheiro(machine.getTotalGenerated()));
         }
 
-        if (machine.getFuel() <= 0) {
-            lines.add("§c§lSEM COMBUSTÍVEL!");
-        } else if (machine.getStoredEarnings() >= maxStorage) {
+        if (machine.getStoredEarnings() >= maxStorage) {
             lines.add("§c§lARMAZÉM CHEIO! RECOLHE OS LUCROS!");
+        } else if (machine.getFuel() <= 0 && machine.getBatteryCycles() <= 0) {
+            lines.add("§c§lSEM COMBUSTÍVEL!");
         } else {
-            lines.add("§7Combustível: §e" + machine.getFuel() + " ciclos");
+            lines.add("§7Combustível: §e" + machine.getFuel() + " §8| §bBateria: "
+                    + machine.getBatteryCycles());
         }
 
         List<ArmorStand> stands = holograms.get(machine.getLocationKey());

@@ -6,6 +6,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 
 public final class TWAsyncTaskQueue {
@@ -33,6 +36,33 @@ public final class TWAsyncTaskQueue {
             });
         } catch (RejectedExecutionException e) {
             plugin.getLogger().log(Level.SEVERE, description + " (fila já encerrada).", e);
+        }
+    }
+
+    public <T> T submitAndWait(String description, Callable<T> task) {
+        Future<T> future;
+        try {
+            future = executor.submit(task);
+        } catch (RejectedExecutionException e) {
+            plugin.getLogger().log(Level.SEVERE, description + " (fila já encerrada).", e);
+            throw new IllegalStateException(description, e);
+        }
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    return future.get();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                    plugin.getLogger().log(Level.SEVERE,
+                            description + " (interrompido; aguardando resultado para preservar a consistência).", e);
+                } catch (ExecutionException e) {
+                    plugin.getLogger().log(Level.SEVERE, description, e.getCause());
+                    throw new IllegalStateException(description, e.getCause());
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 

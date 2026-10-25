@@ -1,0 +1,23 @@
+plot-world: terrenos
+
+purchase:
+  base-price: 50000.0
+  price-multiplier: 2.0
+  timeout-seconds: 180
+
+limits:
+  default: 1
+  prestige-bonus: 1
+  members-per-plot: 10
+  by-rank:
+    CARVAO: 1
+    NEVE: 1
+    SINO: 2
+    BISCOITO: 2
+    DUENDE: 3
+    RENA: 3
+    TRENO: 4
+    QUEBRANOZES: 4
+    ESTRELA: 5
+    NOEL: 5
+    MAX: 6

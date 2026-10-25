@@ -15,13 +15,17 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -54,31 +58,37 @@ public class MachineListener implements Listener {
             itemStack = parseLong(split[2], "máquina");
         }
         if (typeId == null || typeId.isEmpty() || itemStack <= 0) return;
-        long stackToPlace = itemStack * hand.getAmount();
+        long stackToPlace = itemStack;
 
         MachineType type = manager.getMachineTypes().get(typeId);
         if (type == null) return;
 
         Player player = event.getPlayer();
         Block block = event.getBlockPlaced();
+        if (!manager.canPlaceStack(player, block.getLocation(), stackToPlace)) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.RED + "Não podes colocar essa máquina aqui ou o limite de máquinas deste terreno seria excedido.");
+            return;
+        }
 
         PlacedMachine nearby = manager.findNearbySameMachine(block.getLocation(), player.getUniqueId(), typeId, 3);
         if (nearby != null) {
+            if (!manager.canMergeStack(nearby, player, stackToPlace)) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.RED + "O stack ou o limite de máquinas deste terreno atingiria o máximo permitido.");
+                return;
+            }
             event.setCancelled(true);
             nearby.addStack(stackToPlace);
             manager.saveMachineAsync(nearby);
 
             TWMaquinasPlugin.getInstance().getHologramManager().updateOrCreateHologram(nearby, type);
 
-            player.getInventory().setItemInMainHand(null);
+            consumeOne(player, event.getHand());
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.5f);
             player.sendMessage(ChatColor.GREEN + "+" + stackToPlace + "x " + type.getDisplayName() +
                     ChatColor.GREEN + " agrupada! Total no stack: " + ChatColor.YELLOW + nearby.getStackAmount() + "x");
             return;
-        }
-
-        if (hand.getAmount() > 1) {
-            player.getInventory().setItemInMainHand(null);
         }
 
         PlacedMachine placed = new PlacedMachine(
@@ -112,7 +122,7 @@ public class MachineListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) return;
 
         Block block = event.getClickedBlock();
         if (block == null) return;
@@ -147,7 +157,17 @@ public class MachineListener implements Listener {
 
                 // NOVO: Se o jogador estiver no Shift, consome o pack inteiro. Se não, consome só 1.
                 int itemsToConsume = player.isSneaking() ? hand.getAmount() : 1;
-                long totalUnits = fuelUnits * itemsToConsume;
+                long totalUnits;
+                try {
+                    totalUnits = Math.multiplyExact(fuelUnits, itemsToConsume);
+                } catch (ArithmeticException e) {
+                    player.sendMessage(ChatColor.RED + "A quantidade de combustível excede o limite permitido.");
+                    return;
+                }
+                if (!manager.canAddFuel(machine, totalUnits)) {
+                    player.sendMessage(ChatColor.RED + "Esta máquina atingiu o limite de combustível armazenado.");
+                    return;
+                }
 
                 machine.addFuel(totalUnits);
                 manager.saveMachineAsync(machine);
@@ -198,15 +218,46 @@ public class MachineListener implements Listener {
         event.blockList().removeIf(block -> manager.getMachineAt(block.getLocation()) != null);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBlockExplosion(BlockExplodeEvent event) {
+        event.blockList().removeIf(block -> manager.getMachineAt(block.getLocation()) != null);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMachineBurn(BlockBurnEvent event) {
+        if (manager.getMachineAt(event.getBlock().getLocation()) != null) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityChangeMachineBlock(EntityChangeBlockEvent event) {
+        if (manager.getMachineAt(event.getBlock().getLocation()) != null) event.setCancelled(true);
+    }
+
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
+        manager.onChunkLoad(event.getChunk());
         TWMaquinasPlugin.getInstance().getHologramManager().refreshInChunk(
                 event.getChunk(), manager.getPlacedMachines().values(), manager.getMachineTypes());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChunkUnload(ChunkUnloadEvent event) {
+        manager.onChunkUnload(event.getChunk());
         TWMaquinasPlugin.getInstance().getHologramManager().onChunkUnload(event.getChunk());
+    }
+
+    private void consumeOne(Player player, EquipmentSlot hand) {
+        ItemStack held = hand == EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand()
+                : player.getInventory().getItemInMainHand();
+        if (held.getAmount() <= 1) {
+            if (hand == EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
+            else player.getInventory().setItemInMainHand(null);
+            return;
+        }
+        held.setAmount(held.getAmount() - 1);
+        if (hand == EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(held);
+        else player.getInventory().setItemInMainHand(held);
     }
 
     private String getLegacyData(ItemStack item, String prefix) {

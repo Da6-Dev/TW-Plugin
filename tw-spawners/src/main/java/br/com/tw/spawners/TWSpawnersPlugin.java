@@ -7,9 +7,14 @@ import br.com.tw.spawners.data.SpawnerRepository;
 import br.com.tw.spawners.listeners.SpawnerListener;
 import br.com.tw.spawners.managers.SpawnerHologramManager;
 import br.com.tw.spawners.managers.SpawnerManager;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.ServicePriority;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 public class TWSpawnersPlugin extends JavaPlugin {
@@ -22,6 +27,7 @@ public class TWSpawnersPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        migrateConfig();
 
         this.hologramManager = new SpawnerHologramManager(this);
 
@@ -43,6 +49,30 @@ public class TWSpawnersPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new SpawnerListener(spawnerManager), this);
 
         getLogger().info("[TW-Spawners] Sistema de spawners, stacking e hologramas iniciado com sucesso!");
+    }
+
+    private void migrateConfig() {
+        FileConfiguration config = getConfig();
+        int configVersion = config.getInt("config-version", 0);
+
+        if (configVersion < 2
+                && config.getInt("limits.max-spawn-per-cycle", 1000) == 1000) {
+            config.set("limits.max-spawn-per-cycle", 10000);
+        }
+
+        try (InputStream input = getResource("config.yml")) {
+            if (input == null) {
+                throw new IllegalStateException("O recurso config.yml não foi encontrado no JAR.");
+            }
+            FileConfiguration defaults = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(input, StandardCharsets.UTF_8));
+            config.setDefaults(defaults);
+            config.options().copyDefaults(true);
+            config.set("config-version", Math.max(configVersion, 2));
+            saveConfig();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Não foi possível atualizar a configuração dos spawners.", e);
+        }
     }
 
     @Override

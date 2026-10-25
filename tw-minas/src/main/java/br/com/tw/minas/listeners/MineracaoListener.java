@@ -8,6 +8,7 @@ import br.com.tw.minas.TWMinasPlugin;
 import br.com.tw.minas.managers.CartinhasManager;
 import br.com.tw.minas.managers.ComboManager;
 import br.com.tw.minas.managers.MineEventManager;
+import br.com.tw.minas.managers.MinePickaxeManager;
 import br.com.tw.minas.menus.OficinaMenu;
 import br.com.tw.minas.utils.ActionBarUtil;
 import br.com.tw.minas.integrations.RealMinesBridge;
@@ -25,7 +26,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
@@ -64,7 +64,7 @@ public class MineracaoListener implements Listener {
 
         if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
             ItemStack item = player.getInventory().getItemInMainHand();
-            if (item != null && item.getType().name().endsWith("PICKAXE")) {
+            if (TWMinasPlugin.getInstance().getMinePickaxeManager().isMinePickaxe(item)) {
                 new OficinaMenu(player).open();
             }
         }
@@ -75,15 +75,15 @@ public class MineracaoListener implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
         if (!TWCorePlugin.getInstance().isMineWorld(player.getWorld().getName())) return;
-        if (player.getGameMode() == GameMode.CREATIVE) return;
 
         Block mainBlock = event.getBlock();
 
         // Valida se o jogador está realmente com a Picareta na mão
         ItemStack hand = player.getInventory().getItemInMainHand();
-        if (hand == null || !hand.getType().name().endsWith("PICKAXE")) {
+        MinePickaxeManager pickaxeManager = TWMinasPlugin.getInstance().getMinePickaxeManager();
+        if (!pickaxeManager.isMinePickaxe(hand)) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "Precisas de usar a tua Picareta de Natal para minerar!");
+            player.sendMessage(ChatColor.RED + "Precisas de usar a picareta TW-Minas para minerar!");
             return;
         }
 
@@ -106,14 +106,27 @@ public class MineracaoListener implements Listener {
         }
 
         RealMinesBridge realMines = TWMinasPlugin.getInstance().getRealMinesBridge();
+        if (realMines == null) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.RED + "O sistema de minas está indisponível. Contacta a equipa.");
+            return;
+        }
         boolean trackedByRealMines;
         try {
-            trackedByRealMines = realMines != null && realMines.trackBlockBreak(player, event, mainBlock);
+            if (!realMines.isMineBlock(mainBlock)) {
+                event.setCancelled(true);
+                return;
+            }
+            trackedByRealMines = realMines.trackBlockBreak(player, event, mainBlock);
         } catch (IllegalStateException e) {
             event.setCancelled(true);
             TWMinasPlugin.getInstance().getLogger().log(
                     java.util.logging.Level.SEVERE, "Não foi possível atualizar o reset da mina RealMines.", e);
             player.sendMessage(ChatColor.RED + "A mina está temporariamente indisponível. Contacta a equipa.");
+            return;
+        }
+        if (!trackedByRealMines) {
+            event.setCancelled(true);
             return;
         }
         if (event.isCancelled()) return;
@@ -180,8 +193,8 @@ public class MineracaoListener implements Listener {
                 new br.com.tw.core.events.TWMiningPrepareEvent(event.getPlayer(), mainBlock, blocksToBreak));
         for (Block b : blocksToBreak) {
             if (b.getType() == Material.AIR || eventManager.isSpecialBlock(b.getLocation())) continue;
-            if (trackedByRealMines && realMines != null
-                    && !b.getLocation().equals(mainBlock.getLocation())) {
+            if (!realMines.isMineBlock(b)) continue;
+            if (!b.getLocation().equals(mainBlock.getLocation())) {
                 try {
                     realMines.trackBlockBreak(player, b);
                 } catch (IllegalStateException e) {
@@ -191,7 +204,6 @@ public class MineracaoListener implements Listener {
                 }
             }
             double basePrice = eco.getBlockPrice(b.getType());
-
             if (basePrice > 0) {
                 double blockPrice = basePrice + (basePrice * (lvlFortuna * 0.05));
                 if (lvlJackpot > 0 && Math.random() < (lvlJackpot * 0.001)) {
@@ -278,42 +290,8 @@ public class MineracaoListener implements Listener {
     }
 
     private void updatePickaxeLore(Player player, TWUser user) {
-        ItemStack item = player.getInventory().getItemInMainHand();
-        if (item == null || !item.getType().name().endsWith("PICKAXE")) return;
-
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName("§c§lPicareta de Natal §8[Lv. " + user.getPickaxeLevel() + "]");
-
-        double xpNeeded = user.getPickaxeLevel() * 1000.0;
-        double xp = user.getPickaxeXp();
-        int percent = (int) ((xp / xpNeeded) * 10);
-
-        StringBuilder bar = new StringBuilder("§a");
-        for (int i = 0; i < 10; i++) {
-            if (i == percent) bar.append("§7");
-            bar.append("■");
-        }
-
-        List<String> lore = new ArrayList<>();
-        lore.add("§7Nível: §f" + user.getPickaxeLevel());
-        lore.add("§7XP: §f" + (int) xp + " / " + (int) xpNeeded);
-        lore.add("§7Progresso: " + bar.toString());
-        lore.add("");
-        lore.add("§e§lHabilidades:");
-
-        String[] allSkills = {"fortuna", "cacador", "sabedoria", "sorteiro", "jackpot", "explosao", "broca", "laser", "trator", "avalanche", "bateria"};
-        boolean temSkill = false;
-        for (String s : allSkills) {
-            int lvl = user.getSkillLevel(s);
-            if (lvl > 0) {
-                lore.add(" §7• " + s.substring(0, 1).toUpperCase() + s.substring(1) + " Lv. " + lvl);
-                temSkill = true;
-            }
-        }
-        if (!temSkill) lore.add(" §cSem habilidades.");
-
-        meta.setLore(lore);
-        item.setItemMeta(meta);
+        TWMinasPlugin.getInstance().getMinePickaxeManager()
+                .updatePickaxe(player.getInventory().getItemInMainHand(), user);
     }
 
     private boolean checkSkill(TWUser user, String skill, double chanceMultiplier) {
