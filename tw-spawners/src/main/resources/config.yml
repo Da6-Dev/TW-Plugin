@@ -1,4 +1,4 @@
-config-version: 2
+config-version: 3
 
 spawners:
   PIG:
@@ -46,10 +46,7 @@ spawners:
 
 limits:
   # O limite afeta unidades representadas pelo stack, não entidades Bukkit individuais.
-  max-spawn-per-cycle: 10000
   max-entities-per-spawner: 32
-  max-stack-purchase: 1000
-  max-spawner-stack: 1000000
   max-owned-spawners: 100
   max-spawners-per-plot: 25
   plot-world: "terrenos"

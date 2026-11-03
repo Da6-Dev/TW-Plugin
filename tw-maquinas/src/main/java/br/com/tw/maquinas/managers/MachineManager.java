@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
+import java.util.function.Consumer;
 
 public class MachineManager {
 
@@ -41,11 +42,10 @@ public class MachineManager {
     private final Set<String> loggedProcessingFailures = ConcurrentHashMap.newKeySet();
     private final Set<String> activeMachineKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> dirtyMachineKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> removingMachineKeys = ConcurrentHashMap.newKeySet();
 
     private final List<String> rankHierarchy;
     private final String plotWorld;
-    private final int maxMachinesPerPlot;
-    private final long maxStackSize;
     private final int maxSpeedLevel;
     private final int maxStorageLevel;
     private final int maxFuelEfficiencyLevel;
@@ -63,10 +63,6 @@ public class MachineManager {
         if (rules == null) throw new IllegalArgumentException("Configuração ausente: machine-rules.");
         this.plotWorld = TWConfigValidation.requireText(plugin, "machine-rules.plot-world",
                 rules.getString("plot-world", "terrenos"));
-        this.maxMachinesPerPlot = TWConfigValidation.requireIntRange(plugin,
-                "machine-rules.max-machines-per-plot", rules.getInt("max-machines-per-plot", 25), 1, 100000);
-        this.maxStackSize = rules.getLong("max-stack-size", 1_000_000L);
-        if (maxStackSize < 1L) throw new IllegalArgumentException("machine-rules.max-stack-size deve ser positivo.");
         this.maxFuelCycles = rules.getLong("max-fuel-cycles", 10_000_000L);
         if (maxFuelCycles < 1L) throw new IllegalArgumentException("machine-rules.max-fuel-cycles deve ser positivo.");
         ConfigurationSection maxUpgrades = rules.getConfigurationSection("max-upgrades");
@@ -139,7 +135,7 @@ public class MachineManager {
 
                 for (String key : activeMachineKeys) {
                     PlacedMachine machine = placedMachines.get(key);
-                    if (machine == null) continue;
+                    if (machine == null || removingMachineKeys.contains(key)) continue;
                     try {
                         processMachine(machine, nowSec);
                     } catch (RuntimeException e) {
@@ -279,22 +275,23 @@ public class MachineManager {
     public int getMaxFuelEfficiencyLevel() { return maxFuelEfficiencyLevel; }
 
     public boolean canPlaceStack(Player player, Location location, long amount) {
-        if (player == null || location == null || amount < 1L) return false;
-        if (amount > maxStackSize) return false;
+        if (player == null || location == null || location.getWorld() == null || amount < 1L) return false;
         if (!plotWorld.equalsIgnoreCase(location.getWorld().getName())) return true;
 
         Plot plot = plotAt(location);
         if (plot == null) return false;
         if (!player.hasPermission("tw.admin") && !plot.isOwner(player.getUniqueId())
                 && !plot.isAdded(player.getUniqueId())) return false;
-
-        long currentCount = countMachinesInPlot(plot);
-        return currentCount <= maxMachinesPerPlot
-                && amount <= Math.min(maxStackSize, maxMachinesPerPlot - currentCount);
+        return true;
     }
 
     public boolean canMergeStack(PlacedMachine existing, Player player, long amount) {
-        if (existing == null || amount < 1L || existing.getStackAmount() > maxStackSize - amount) return false;
+        if (existing == null || amount < 1L) return false;
+        try {
+            Math.addExact(existing.getStackAmount(), amount);
+        } catch (ArithmeticException e) {
+            return false;
+        }
         Location location = existing.getBukkitLocation();
         return canPlaceStack(player, location, amount);
     }
@@ -320,10 +317,6 @@ public class MachineManager {
     public long countMachinesInPlotAt(Location location) {
         if (location == null || !plotWorld.equalsIgnoreCase(location.getWorld().getName())) return 0L;
         return countMachinesInPlot(plotAt(location));
-    }
-
-    public int getMaxMachinesPerPlot() {
-        return maxMachinesPerPlot;
     }
 
     private Plot plotAt(Location location) {
@@ -371,6 +364,7 @@ public class MachineManager {
         if (!TWCorePlugin.getInstance().getUserManager().flushUserSync(owner)) {
             throw new IllegalStateException("Não foi possível persistir o saldo antes do pagamento.");
         }
+        saveMachineAsync(machine);
         OptionalDouble updatedBalance = saveQueue.submitAndWait(
                 "Falha ao recolher os lucros da máquina " + machine.getLocationKey() + ".",
                 () -> repository.collectEarnings(machine.getLocationKey(), owner.getUuid(), stored, payout));
@@ -535,19 +529,41 @@ public class MachineManager {
         saveMachineAsync(machine);
     }
 
-    public boolean removeMachine(Location loc) {
-        String key = PlacedMachine.toKey(loc);
-        boolean deleted = saveQueue.submitAndWait("Falha ao remover máquina " + key + " do banco.",
-                () -> repository.deleteMachine(key));
-        if (!deleted) return false;
-        placedMachines.remove(key);
-        activeMachineKeys.remove(key);
-        dirtyMachineKeys.remove(key);
+    public synchronized boolean removeMachine(PlacedMachine machine, Consumer<Boolean> completion) {
+        if (machine == null || completion == null) return false;
+        String key = machine.getLocationKey();
+        if (placedMachines.get(key) != machine || !removingMachineKeys.add(key)) return false;
+        saveQueue.submit("Falha ao remover máquina " + key + " do banco.", () -> {
+            final boolean deleted;
+            try {
+                deleted = repository.deleteMachine(key);
+            } catch (RuntimeException e) {
+                Bukkit.getScheduler().runTask(plugin, () -> completeMachineRemoval(key, machine, false, completion));
+                throw e;
+            }
+            Bukkit.getScheduler().runTask(plugin,
+                    () -> completeMachineRemoval(key, machine, deleted, completion));
+        });
         return true;
+    }
+
+    private void completeMachineRemoval(String key, PlacedMachine machine, boolean deleted,
+                                        Consumer<Boolean> completion) {
+        boolean removed = deleted && placedMachines.remove(key, machine);
+        if (removed) {
+            activeMachineKeys.remove(key);
+            dirtyMachineKeys.remove(key);
+        }
+        removingMachineKeys.remove(key);
+        completion.accept(removed);
     }
 
     public int getActiveMachineCount() {
         return activeMachineKeys.size();
+    }
+
+    public boolean isRemovingMachine(PlacedMachine machine) {
+        return machine != null && removingMachineKeys.contains(machine.getLocationKey());
     }
 
     public long getTotalStackedMachines() {
@@ -568,6 +584,7 @@ public class MachineManager {
     }
 
     public void saveMachineAsync(PlacedMachine machine) {
+        if (removingMachineKeys.contains(machine.getLocationKey())) return;
         PlacedMachine snapshot = machine.snapshot();
         dirtyMachineKeys.remove(snapshot.getLocationKey());
         saveQueue.submit("Falha ao salvar máquina " + snapshot.getLocationKey() + " no banco.",
@@ -585,6 +602,7 @@ public class MachineManager {
 
     private void saveAllAsync() {
         for (String key : new ArrayList<>(dirtyMachineKeys)) {
+            if (removingMachineKeys.contains(key)) continue;
             PlacedMachine machine = placedMachines.get(key);
             if (machine == null || !dirtyMachineKeys.remove(key)) continue;
             PlacedMachine snapshot = machine.snapshot();

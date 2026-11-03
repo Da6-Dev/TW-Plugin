@@ -3,9 +3,11 @@ package br.com.tw.maquinas.listeners;
 import br.com.tw.maquinas.TWMaquinasPlugin;
 import br.com.tw.maquinas.managers.MachineManager;
 import br.com.tw.maquinas.menus.MachinePanelMenu;
+import br.com.tw.maquinas.menus.MachineShopMenu;
 import br.com.tw.maquinas.models.MachineType;
 import br.com.tw.maquinas.models.PlacedMachine;
 import br.com.tw.core.utils.TWItemTags;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
@@ -23,19 +25,57 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MachineListener implements Listener {
+
+    public static final Map<UUID, MachineType> pendingPurchases = new ConcurrentHashMap<>();
 
     private final MachineManager manager;
 
     public MachineListener(MachineManager manager) {
         this.manager = manager;
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onChatPurchase(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        MachineType type = pendingPurchases.remove(player.getUniqueId());
+        if (type == null) return;
+
+        event.setCancelled(true);
+        if (event.getMessage().equalsIgnoreCase("cancelar")) {
+            player.sendMessage("§cCompra cancelada.");
+            return;
+        }
+
+        final long amount;
+        try {
+            amount = Long.parseLong(event.getMessage());
+            if (amount < 1L) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cQuantidade inválida. Digite um número inteiro positivo ou 'cancelar'.");
+            return;
+        }
+
+        Bukkit.getScheduler().runTask(TWMaquinasPlugin.getInstance(), () -> {
+            if (player.isOnline()) new MachineShopMenu(player).purchaseMachine(type, amount);
+        });
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        pendingPurchases.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -67,7 +107,7 @@ public class MachineListener implements Listener {
         Block block = event.getBlockPlaced();
         if (!manager.canPlaceStack(player, block.getLocation(), stackToPlace)) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "Não podes colocar essa máquina aqui ou o limite de máquinas deste terreno seria excedido.");
+            player.sendMessage(ChatColor.RED + "Não podes colocar essa máquina neste local ou não tens acesso ao terreno.");
             return;
         }
 
@@ -75,7 +115,7 @@ public class MachineListener implements Listener {
         if (nearby != null) {
             if (!manager.canMergeStack(nearby, player, stackToPlace)) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.RED + "O stack ou o limite de máquinas deste terreno atingiria o máximo permitido.");
+                player.sendMessage(ChatColor.RED + "O stack excede o limite numérico permitido ou não tens acesso ao terreno.");
                 return;
             }
             event.setCancelled(true);

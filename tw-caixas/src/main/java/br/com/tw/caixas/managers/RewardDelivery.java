@@ -54,21 +54,29 @@ public final class RewardDelivery {
                     player.giveExpLevels((int) amount);
                     descriptions.add("§d" + amount + " níveis de XP");
                     break;
-                    case SOULS:
-                        overflow.add(createSoulsItem(amount));
-                        descriptions.add("§c" + amount + " Almas");
-                        break;
-                    case ITEM:
-                        if ("farm_growth".equals(reward.getEffect())
-                                || "golden_scythe".equals(reward.getEffect())) {
-                            for (long i = 0; i < amount; i++) overflow.add(createNativeFarmItem(reward));
-                        } else if (reward.getEffect() != null) {
-                            for (long i = 0; i < amount; i++) overflow.add(reward.createItem(1L));
-                        } else {
-                            overflow.addAll(createStacks(reward.createItem(1L), amount));
-                        }
-                        descriptions.add(reward.getDisplayName() == null ? "§fItem de recompensa" : reward.getDisplayName());
-                        break;
+                case SOULS:
+                    long remainingSouls;
+                    try {
+                        remainingSouls = getSpawnerManager().giveSoulItems(player, amount);
+                    } catch (ArithmeticException e) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Overflow ao combinar almas antigas com uma recompensa de " + player.getName() + ".", e);
+                        remainingSouls = amount;
+                    }
+                    if (remainingSouls > 0L) overflow.add(createSoulsItem(remainingSouls));
+                    descriptions.add("§c" + amount + " Almas");
+                    break;
+                case ITEM:
+                    if ("farm_growth".equals(reward.getEffect())
+                            || "golden_scythe".equals(reward.getEffect())) {
+                        for (long i = 0; i < amount; i++) overflow.add(createNativeFarmItem(reward));
+                    } else if (reward.getEffect() != null) {
+                        for (long i = 0; i < amount; i++) overflow.add(reward.createItem(1L));
+                    } else {
+                        overflow.addAll(createStacks(reward.createItem(1L), amount));
+                    }
+                    descriptions.add(reward.getDisplayName() == null ? "§fItem de recompensa" : reward.getDisplayName());
+                    break;
                 default:
                     throw new IllegalStateException("Tipo de recompensa sem tratamento: " + reward.getKind());
             }
@@ -114,11 +122,15 @@ public final class RewardDelivery {
     }
 
     private ItemStack createSoulsItem(long amount) {
+        return getSpawnerManager().createSoulItem(amount);
+    }
+
+    private br.com.tw.spawners.managers.SpawnerManager getSpawnerManager() {
         br.com.tw.spawners.TWSpawnersPlugin spawners = br.com.tw.spawners.TWSpawnersPlugin.getInstance();
         if (spawners == null || spawners.getSpawnerManager() == null) {
             throw new IllegalStateException("tw-spawners não está inicializado para criar a recompensa.");
         }
-        return spawners.getSpawnerManager().createSoulItem(amount);
+        return spawners.getSpawnerManager();
     }
 
     private ItemStack createNativeFarmItem(CrateReward reward) {

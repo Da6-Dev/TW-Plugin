@@ -35,6 +35,7 @@ public class RankupMaxCommand implements CommandExecutor {
         }
 
         int ranksEvoluidos = 0;
+        boolean mailRewardFailed = false;
         String novoRank = user.getRankId();
 
         while (true) {
@@ -48,14 +49,19 @@ public class RankupMaxCommand implements CommandExecutor {
 
             double cost = plugin.getRanksConfig().getDouble("ranks." + novoRank + ".cost");
             if (user.removeBalance(cost)) {
-                    novoRank = nextRank;
-                    ranksEvoluidos++;
+                if (!plugin.deliverMailRewards(player, nextRank)) {
+                    user.addBalance(cost);
+                    mailRewardFailed = true;
+                    break;
+                }
+                novoRank = nextRank;
+                ranksEvoluidos++;
 
-                    // Executa comandos de recompensa para cada rank passado
-                    List<String> cmds = plugin.getRanksConfig().getStringList("ranks." + novoRank + ".commands");
-                    for (String cmd : cmds) {
-                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd.replace("%player%", player.getName()));
-                    }
+                // Executa comandos de recompensa para cada rank passado
+                List<String> cmds = plugin.getRanksConfig().getStringList("ranks." + novoRank + ".commands");
+                for (String cmd : cmds) {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd.replace("%player%", player.getName()));
+                }
             } else {
                 break;
             }
@@ -67,7 +73,15 @@ public class RankupMaxCommand implements CommandExecutor {
             TWCorePlugin.getInstance().syncLuckPermsGroups(player.getName(), user);
 
             player.sendMessage(ChatColor.GREEN + "Evoluíste " + ranksEvoluidos + " ranks! Agora estás no Rank " + ChatColor.YELLOW + ChatColor.BOLD + novoRank);
+            if (mailRewardFailed) {
+                player.sendMessage(ChatColor.RED + "A evolução foi interrompida porque a recompensa seguinte não chegou ao correio; "
+                        + "o valor dessa etapa foi devolvido.");
+            }
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 0.8f);
+        } else if (mailRewardFailed) {
+            TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
+            player.sendMessage(ChatColor.RED + "O rankup foi cancelado: a recompensa não chegou ao correio. "
+                    + "O valor foi devolvido; contacta a equipa.");
         } else {
             player.sendMessage(ChatColor.RED + "Não tens dinheiro suficiente para evoluir de rank.");
         }

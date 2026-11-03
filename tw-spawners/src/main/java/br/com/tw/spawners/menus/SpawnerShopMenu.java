@@ -88,8 +88,9 @@ public class SpawnerShopMenu implements TWMenu {
         ItemStack item = new ItemStack(Material.BOOK);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName("§b§lTW NETWORK §8» §fLoja de Spawners");
-        meta.setLore(Arrays.asList("§7Compra geradores e boosters.", "§7Stack colocado por item: até §e"
-                + manager.getMaxSpawnerStack(), "§7Página §e" + (currentPage + 1) + "§7/§e" + pageCount));
+        meta.setLore(Arrays.asList("§7Compra geradores e boosters.",
+                "§7Digite uma quantidade livre para comprar stacks.",
+                "§7Página §e" + (currentPage + 1) + "§7/§e" + pageCount));
         item.setItemMeta(meta);
         return item;
     }

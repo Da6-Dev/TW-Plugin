@@ -44,5 +44,12 @@
             <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
+        <dependency>
+            <groupId>io.github.rismr1</groupId>
+            <artifactId>mailboxgui-api</artifactId>
+            <version>6.1.0</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>

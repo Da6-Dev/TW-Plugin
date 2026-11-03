@@ -6,6 +6,8 @@ import br.com.tw.minas.listeners.MineracaoListener;
 import br.com.tw.minas.managers.CartinhasManager;
 import br.com.tw.minas.managers.MinePickaxeManager;
 import br.com.tw.minas.managers.MineEventManager;
+import br.com.tw.minas.managers.PvpArenaManager;
+import br.com.tw.minas.managers.PvpKitManager;
 import br.com.tw.minas.integrations.RealMinesBridge;
 import org.bukkit.GameRule;
 import org.bukkit.World;
@@ -21,6 +23,8 @@ public class TWMinasPlugin extends JavaPlugin implements Listener {
     private MineEventManager mineEventManager;
     private MinePickaxeManager minePickaxeManager;
     private RealMinesBridge realMinesBridge;
+    private PvpKitManager pvpKitManager;
+    private PvpArenaManager pvpArenaManager;
 
     @Override
     public void onEnable() {
@@ -41,12 +45,31 @@ public class TWMinasPlugin extends JavaPlugin implements Listener {
 
         this.cartinhasManager = new CartinhasManager();
         this.minePickaxeManager = new MinePickaxeManager(this);
+        this.pvpKitManager = new PvpKitManager(this);
+        this.pvpArenaManager = new PvpArenaManager(this, pvpKitManager);
         this.mineEventManager = new MineEventManager(this);
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new MineracaoListener(), this);
         getServer().getPluginManager().registerEvents(new MineProtectionListener(), this);
         getCommand("mina").setExecutor(new MinaCommand());
+        getCommand("kits").setExecutor(pvpKitManager);
+        getCommand("minapvp").setExecutor((sender, command, label, args) -> {
+            if (sender instanceof org.bukkit.entity.Player) {
+                pvpArenaManager.enter((org.bukkit.entity.Player) sender);
+            } else {
+                sender.sendMessage("Este comando só pode ser usado por um jogador.");
+            }
+            return true;
+        });
+        getCommand("pvpsair").setExecutor((sender, command, label, args) -> {
+            if (sender instanceof org.bukkit.entity.Player) {
+                pvpArenaManager.leave((org.bukkit.entity.Player) sender);
+            } else {
+                sender.sendMessage("Este comando só pode ser usado por um jogador.");
+            }
+            return true;
+        });
         World mineWorld = getServer().getWorld(br.com.tw.core.TWCorePlugin.getInstance().getMineWorldName());
         if (mineWorld != null) configureMineWorld(mineWorld);
 
@@ -58,6 +81,9 @@ public class TWMinasPlugin extends JavaPlugin implements Listener {
         if (mineEventManager != null) {
             mineEventManager.cleanupAll();
         }
+        if (pvpArenaManager != null) {
+            pvpArenaManager.shutdown();
+        }
     }
 
     public static TWMinasPlugin getInstance() { return instance; }
@@ -65,6 +91,8 @@ public class TWMinasPlugin extends JavaPlugin implements Listener {
     public MineEventManager getMineEventManager() { return mineEventManager; }
     public MinePickaxeManager getMinePickaxeManager() { return minePickaxeManager; }
     public RealMinesBridge getRealMinesBridge() { return realMinesBridge; }
+    public PvpArenaManager getPvpArenaManager() { return pvpArenaManager; }
+    public PvpKitManager getPvpKitManager() { return pvpKitManager; }
 
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {

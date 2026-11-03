@@ -63,9 +63,8 @@ public class SpawnerPanelMenu implements TWMenu {
                 "§7Entidade: §a" + type.getEntityType().name(),
                 "§7Stack Acumulado: §e" + spawner.getStackAmount() + "x",
                 "§7Abates Históricos: §c" + spawner.getTotalKills(),
-                "§7Limite por ciclo: §e" + manager.getMaxSpawnPerCycle(),
                 "§7Unidades neste ciclo: §b" + br.com.tw.spawners.managers.SpawnerSpawnMath.amount(
-                        spawner.getStackAmount(), spawner.getAmountLevel(), manager.getMaxSpawnPerCycle()),
+                        spawner.getStackAmount(), spawner.getAmountLevel()),
                 "§7Produção física pendente: §d" + spawner.getPendingPhysicalSpawn()
         ));
         info.setItemMeta(iMeta);
@@ -225,27 +224,27 @@ public class SpawnerPanelMenu implements TWMenu {
             long deliveredXp = Math.min(finalXp, Integer.MAX_VALUE);
             spawner.setStoredXp(finalXp - deliveredXp);
             long finalSouls = spawner.getStoredSouls();
-            boolean soulsRemainInSilo = false;
+            long soulsRemaining = finalSouls;
             if (finalSouls > 0) {
-                ItemStack[] previousContents = snapshotInventoryContents();
-                java.util.Map<Integer, ItemStack> leftovers = player.getInventory()
-                        .addItem(manager.createSoulItem(finalSouls));
-                if (!leftovers.isEmpty()) {
-                    player.getInventory().setContents(previousContents);
-                    soulsRemainInSilo = true;
-                } else {
-                    spawner.setStoredSouls(0L);
+                try {
+                    soulsRemaining = manager.giveSoulItems(player, finalSouls);
+                } catch (ArithmeticException e) {
+                    TWSpawnersPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                            "Overflow ao combinar almas antigas ao recolher o cofre "
+                                    + spawner.getLocationKey() + ".", e);
                 }
+                spawner.setStoredSouls(soulsRemaining);
             }
 
-            if (deliveredXp > 0 || (!soulsRemainInSilo && finalSouls > 0)) manager.saveSpawnerAsync(spawner);
+            boolean soulsRemainInSilo = soulsRemaining > 0L;
+            if (deliveredXp > 0 || soulsRemaining != finalSouls) manager.saveSpawnerAsync(spawner);
             TWSpawnersPlugin.getInstance().getHologramManager().updateOrCreateHologram(spawner, type);
 
             if (deliveredXp > 0) player.giveExp((int) deliveredXp);
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.5f);
             double paidMoney = payout == null ? 0.0 : payout.getMoney();
             long paidTokens = payout == null ? 0L : payout.getPaidTokens();
-            long paidSouls = soulsRemainInSilo ? 0L : finalSouls;
+            long paidSouls = Math.max(0L, finalSouls - Math.min(finalSouls, soulsRemaining));
             player.sendMessage("§a✔ Cofre resgatado! §2$" + TWFormat.formatarDinheiro(paidMoney)
                     + " §8| §b" + paidTokens + " T §8| §a" + deliveredXp + " XP §8| §d" + paidSouls + " Almas");
             if (soulsRemainInSilo) {

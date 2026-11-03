@@ -25,8 +25,8 @@ public class SpawnersCommand implements CommandExecutor {
                         + " §8| Carregados: §a" + manager.getActiveSpawnerCount());
                 sender.sendMessage(ChatColor.GRAY + "Unidades em stacks: §e" + manager.getTotalStackedSpawnerCount()
                         + " §8| Físicos pendentes: §b" + manager.getTotalPendingPhysical());
-                sender.sendMessage(ChatColor.GRAY + "Limite por ciclo: §e" + manager.getMaxSpawnPerCycle()
-                        + " §8| Máximo pendente: §e" + manager.getMaxPendingPhysical());
+                sender.sendMessage(ChatColor.GRAY + "Geração por ciclo: §eSem teto artificial"
+                        + " §8| Máximo pendente físico: §e" + manager.getMaxPendingPhysical());
                 return true;
             }
             if (args.length < 2) {

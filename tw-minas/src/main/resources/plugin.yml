@@ -3,8 +3,32 @@ version: 1.0
 api-version: '26.3'
 main: br.com.tw.minas.TWMinasPlugin
 depend: [tw-core, tw-economia]
-softdepend: [RealMines]
+softdepend: [RealMines, EssentialsC, Multiverse-Inventories, WorldGuard, CombatLog, VoidGen]
 commands:
   mina:
     description: Abre a Central de Mineracao
     aliases: [minas]
+  minapvp:
+    description: Entra na Mina PvP
+    aliases: [pvp]
+    permission: tw-minas.pvp.enter
+  pvpsair:
+    description: Sai da Mina PvP levando seus itens
+    permission: tw-minas.pvp.leave
+  kits:
+    description: Abre o menu dos kits PvP
+    aliases: [kit]
+    permission: tw-minas.kits
+permissions:
+  tw-minas.pvp.enter:
+    default: true
+  tw-minas.pvp.leave:
+    default: true
+  tw-minas.kits:
+    default: true
+  tw-minas.kits.vip:
+    default: false
+  tw-minas.kits.prestige:
+    default: false
+  tw-minas.pvp.admin:
+    default: op

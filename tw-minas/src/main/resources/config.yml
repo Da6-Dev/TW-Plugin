@@ -11,3 +11,123 @@ events:
   meteorite-completion-reward: 5000
   actionbar-update-ticks: 20
   cleanup-interval-ticks: 20
+
+pvp:
+  world: mina_pvp
+  allowed-origin-worlds:
+    - world
+    - world_nether
+    - terrenos
+  spawn:
+    x: 0.5
+    y: 101
+    z: 0.5
+    yaw: 0
+    pitch: 0
+    floor-y: 100
+  arena:
+    radius: 64
+  session-save-interval-ticks: 100
+  kits:
+    basic:
+      display-name: "&aKit Básico"
+      permission: ""
+      icon: IRON_SWORD
+      cooldown-seconds: 3600
+      items:
+        - material: IRON_SWORD
+          amount: 1
+        - material: SHIELD
+          amount: 1
+        - material: IRON_HELMET
+          amount: 1
+        - material: IRON_CHESTPLATE
+          amount: 1
+        - material: IRON_LEGGINGS
+          amount: 1
+        - material: IRON_BOOTS
+          amount: 1
+        - material: BOW
+          amount: 1
+        - material: ARROW
+          amount: 24
+        - material: COOKED_BEEF
+          amount: 24
+        - material: GOLDEN_APPLE
+          amount: 2
+    vip:
+      display-name: "&bKit VIP"
+      permission: tw-minas.kits.vip
+      icon: DIAMOND_CHESTPLATE
+      cooldown-seconds: 3600
+      items:
+        - material: DIAMOND_SWORD
+          amount: 1
+          enchantments:
+            SHARPNESS: 1
+        - material: SHIELD
+          amount: 1
+        - material: IRON_HELMET
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: IRON_CHESTPLATE
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: IRON_LEGGINGS
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: IRON_BOOTS
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: BOW
+          amount: 1
+          enchantments:
+            POWER: 1
+        - material: ARROW
+          amount: 32
+        - material: COOKED_BEEF
+          amount: 32
+        - material: GOLDEN_APPLE
+          amount: 4
+    prestige:
+      display-name: "&6Kit Prestígio"
+      permission: tw-minas.kits.prestige
+      icon: DIAMOND_SWORD
+      cooldown-seconds: 3600
+      items:
+        - material: DIAMOND_SWORD
+          amount: 1
+          enchantments:
+            SHARPNESS: 2
+        - material: SHIELD
+          amount: 1
+        - material: DIAMOND_HELMET
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: DIAMOND_CHESTPLATE
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: DIAMOND_LEGGINGS
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: DIAMOND_BOOTS
+          amount: 1
+          enchantments:
+            PROTECTION: 1
+        - material: BOW
+          amount: 1
+          enchantments:
+            POWER: 1
+        - material: ARROW
+          amount: 48
+        - material: COOKED_BEEF
+          amount: 48
+        - material: GOLDEN_APPLE
+          amount: 6

@@ -134,6 +134,10 @@ public class MachinePanelMenu implements TWMenu {
 
     @Override
     public void onClick(InventoryClickEvent event) {
+        if (manager.isRemovingMachine(machine)) {
+            player.sendMessage(ChatColor.YELLOW + "Esta máquina está a ser desmontada.");
+            return;
+        }
         if (!machine.getOwnerUuid().equals(player.getUniqueId()) && !player.hasPermission("tw.admin")) {
             player.sendMessage(ChatColor.RED + "Apenas o proprietário pode gerir esta máquina!");
             return;
@@ -229,44 +233,36 @@ public class MachinePanelMenu implements TWMenu {
         }
 
         ItemStack returnedMachine = manager.createMachineItem(type, machine.getStackAmount());
-        ItemStack[] previousContents = snapshotInventoryContents();
-        java.util.Map<Integer, ItemStack> leftovers = player.getInventory().addItem(returnedMachine);
-        if (!leftovers.isEmpty()) {
-            player.getInventory().setContents(previousContents);
-            player.sendMessage(ChatColor.RED + "Libera espaço no inventário para desmontar a máquina.");
-            return;
-        }
-
-        boolean removed;
-        try {
-            removed = manager.removeMachine(loc);
-        } catch (IllegalStateException e) {
-            player.getInventory().setContents(previousContents);
-            TWMaquinasPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
-                    "Falha ao desmontar a máquina em " + machine.getLocationKey() + ".", e);
-            player.sendMessage(ChatColor.RED + "Não foi possível desmontar a máquina. Tenta novamente mais tarde.");
-            return;
-        }
-        if (!removed) {
-            player.getInventory().setContents(previousContents);
-            player.sendMessage(ChatColor.RED + "Esta máquina já foi removida ou os dados mudaram.");
-            return;
-        }
-
         player.closeInventory();
-        TWMaquinasPlugin.getInstance().getHologramManager().removeHologram(machine.getLocationKey());
-        loc.getBlock().setType(Material.AIR);
+        player.sendMessage(ChatColor.YELLOW + "Desmontagem iniciada; aguarda a confirmação.");
+        boolean queued = manager.removeMachine(machine, removed -> {
+            if (!removed) {
+                if (player.isOnline()) {
+                    player.sendMessage(ChatColor.RED + "Não foi possível desmontar a máquina. Tenta novamente mais tarde.");
+                }
+                return;
+            }
 
-        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1f);
-        player.sendMessage(ChatColor.YELLOW + "Desmontaste a máquina com sucesso!");
-    }
-
-    private ItemStack[] snapshotInventoryContents() {
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int slot = 0; slot < contents.length; slot++) {
-            if (contents[slot] != null) contents[slot] = contents[slot].clone();
+            TWMaquinasPlugin.getInstance().getHologramManager().removeHologram(machine.getLocationKey());
+            loc.getBlock().setType(Material.AIR);
+            if (player.isOnline()) {
+                java.util.Map<Integer, ItemStack> leftovers = player.getInventory().addItem(returnedMachine);
+                for (ItemStack leftover : leftovers.values()) {
+                    loc.getWorld().dropItemNaturally(loc.clone().add(0.5, 1.0, 0.5), leftover);
+                }
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1f);
+                player.sendMessage(ChatColor.YELLOW + "Desmontaste a máquina com sucesso!");
+                if (!leftovers.isEmpty()) {
+                    player.sendMessage(ChatColor.YELLOW + "O inventário estava cheio; a máquina ficou no chão.");
+                }
+            } else {
+                loc.getWorld().dropItemNaturally(loc.clone().add(0.5, 1.0, 0.5), returnedMachine);
+            }
+        });
+        if (!queued) {
+            player.sendMessage(ChatColor.RED + "Esta máquina já está a ser desmontada ou os dados mudaram.");
+            return;
         }
-        return contents;
     }
 
     private void performUpgrade(TWUser user, String upgrade, long cost) {

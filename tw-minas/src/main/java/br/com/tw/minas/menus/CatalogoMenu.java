@@ -2,6 +2,7 @@ package br.com.tw.minas.menus;
 
 import br.com.tw.core.menus.TWMenu;
 import br.com.tw.core.utils.TWMenuFrame;
+import br.com.tw.minas.TWMinasPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -54,7 +55,7 @@ public class CatalogoMenu implements TWMenu {
         warpsMap.put(40, new WarpInfo("krampus", "realmines.krampus.break", Material.BEACON, "§4Prestígio III [Krampus]"));
 
         // PvP (Sempre desbloqueada)
-        warpsMap.put(42, new WarpInfo(null, "", Material.DIAMOND_SWORD, "§c⚒ Mina PvP [Congelada]"));
+        warpsMap.put(42, new WarpInfo(null, "", Material.DIAMOND_SWORD, "§c⚒ Mina PvP"));
     }
 
     private void setupItems() {
@@ -115,7 +116,7 @@ public class CatalogoMenu implements TWMenu {
             player.sendMessage(ChatColor.GREEN + "⚒ A viajar para a mina " + info.name + "...");
             boolean dispatched;
             if (info.mineName == null) {
-                dispatched = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "warp minapvp " + player.getName());
+                dispatched = TWMinasPlugin.getInstance().getPvpArenaManager().enter(player);
             } else {
                 dispatched = Bukkit.dispatchCommand(player, "mine tp " + info.mineName);
             }

@@ -74,7 +74,7 @@ public class SpawnerListener implements Listener {
 
             try {
                 long amount = Long.parseLong(event.getMessage());
-                if (amount <= 0 || amount > manager.getMaxStackPurchase()) throw new NumberFormatException();
+                if (amount <= 0) throw new NumberFormatException();
 
                 // Volta para a thread principal para dar os itens e remover saldo com segurança
                 Bukkit.getScheduler().runTask(TWSpawnersPlugin.getInstance(), () -> {
@@ -112,8 +112,7 @@ public class SpawnerListener implements Listener {
                 });
 
             } catch (NumberFormatException e) {
-                player.sendMessage("§cQuantidade inválida. Escolhe um valor entre 1 e "
-                        + manager.getMaxStackPurchase() + ".");
+                player.sendMessage("§cQuantidade inválida. Digite um inteiro positivo ou 'cancelar'.");
             }
         }
     }
@@ -121,8 +120,7 @@ public class SpawnerListener implements Listener {
     private void completeSpawnerPurchase(Player player, TWUser user, SpawnerType type,
                                          long amount, double totalCost) {
         if (!player.isOnline()) return;
-        if (amount < 1L || amount > manager.getMaxStackPurchase()
-                || !Double.isFinite(totalCost) || totalCost < 0.0) {
+        if (amount < 1L || !Double.isFinite(totalCost) || totalCost < 0.0) {
             player.sendMessage(ChatColor.RED + "Os dados da compra expiraram ou são inválidos.");
             return;
         }
@@ -229,11 +227,9 @@ public class SpawnerListener implements Listener {
 
         Block block = event.getBlockPlaced();
         PlacedSpawner nearby = manager.findNearbySameSpawner(block.getLocation(), player.getUniqueId(), typeId, 3);
-        if (stackToPlace > manager.getMaxSpawnerStack()
-                || (nearby != null && nearby.getStackAmount() > manager.getMaxSpawnerStack() - stackToPlace)
-                || !manager.canPlaceStack(player, block.getLocation(), stackToPlace, nearby != null)) {
+        if (!manager.canPlaceStack(player, block.getLocation(), stackToPlace, nearby != null)) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "Não podes colocar esse stack aqui: verifica o limite do terreno, da conta e do spawner.");
+            player.sendMessage(ChatColor.RED + "Não podes colocar esse stack aqui: verifica os limites de spawners e o acesso ao terreno.");
             return;
         }
 
@@ -388,10 +384,12 @@ public class SpawnerListener implements Listener {
                     return;
                 }
                 Location anchor = manager.getMobOrigin(entity);
+                Location spawnPoint = manager.getMobSpawnLocation(anchor);
+                if (spawnPoint == null) return;
                 Bukkit.getScheduler().runTaskLater(TWSpawnersPlugin.getInstance(), () -> {
                     if (entity.isValid() && !entity.isDead()) {
                         entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-                        entity.teleport(anchor);
+                        entity.teleport(spawnPoint);
                     }
                 }, 1L);
             }
@@ -463,26 +461,37 @@ public class SpawnerListener implements Listener {
             if (tokensWon > 0) user.addTokens(tokensWon);
             TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
             if (soulsWon > 0) {
-                java.util.Map<Integer, ItemStack> leftovers =
-                        killer.getInventory().addItem(manager.createSoulItem(soulsWon));
-                if (!leftovers.isEmpty()) {
+                long soulsRemaining;
+                try {
+                    soulsRemaining = manager.giveSoulItems(killer, soulsWon);
+                } catch (ArithmeticException e) {
+                    TWSpawnersPlugin.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                            "Overflow ao combinar almas antigas com a recompensa de " + killer.getName() + ".", e);
+                    soulsRemaining = soulsWon;
+                }
+                if (soulsRemaining > 0L) {
                     PlacedSpawner placedSpawner = manager.getSpawnerAt(anchor);
                     if (placedSpawner == null) {
                         TWSpawnersPlugin.getInstance().getLogger().severe(
-                                "Não foi possível entregar " + soulsWon + " almas ao jogador "
-                                        + killer.getName() + ": inventário cheio e spawner não registado em " + anchor + ".");
-                        killer.sendMessage("§cO inventário está cheio e as almas não puderam ser entregues. Contacta a equipa.");
+                                "O inventário ficou sem espaço para " + soulsRemaining + " almas de "
+                                        + killer.getName() + "; spawner não registado em " + anchor + ".");
+                        killer.getWorld().dropItemNaturally(killer.getLocation(),
+                                manager.createSoulItem(soulsRemaining));
+                        killer.sendMessage("§eO inventário está cheio; as almas restantes foram deixadas no chão.");
                     } else {
                         try {
-                            placedSpawner.setStoredSouls(Math.addExact(placedSpawner.getStoredSouls(), soulsWon));
+                            placedSpawner.setStoredSouls(Math.addExact(
+                                    placedSpawner.getStoredSouls(), soulsRemaining));
                             manager.saveSpawnerAsync(placedSpawner);
-                            killer.sendMessage("§dO inventário está cheio; §e" + soulsWon
+                            killer.sendMessage("§dO inventário está cheio; §e" + soulsRemaining
                                     + " almas §dforam guardadas no cofre do spawner.");
                         } catch (ArithmeticException e) {
                             TWSpawnersPlugin.getInstance().getLogger().severe(
                                     "O cofre de almas excedeu o limite numérico no spawner "
                                             + placedSpawner.getLocationKey() + ".");
-                            killer.sendMessage("§cO cofre de almas atingiu o limite. Contacta a equipa.");
+                            killer.getWorld().dropItemNaturally(killer.getLocation(),
+                                    manager.createSoulItem(soulsRemaining));
+                            killer.sendMessage("§eO cofre atingiu o limite; as almas restantes foram deixadas no chão.");
                         }
                     }
                 }
@@ -496,7 +505,9 @@ public class SpawnerListener implements Listener {
         }
 
         if (remaining > 0) {
-            LivingEntity next = (LivingEntity) entity.getWorld().spawnEntity(anchor, type.getEntityType());
+            Location spawnPoint = manager.getMobSpawnLocation(anchor);
+            if (spawnPoint == null) return;
+            LivingEntity next = (LivingEntity) entity.getWorld().spawnEntity(spawnPoint, type.getEntityType());
             next.setRemoveWhenFarAway(false); next.setCanPickupItems(false);
             next.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 250, false, false));
             next.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, Integer.MAX_VALUE, 250, false, false));

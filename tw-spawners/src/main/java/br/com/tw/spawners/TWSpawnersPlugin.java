@@ -55,9 +55,8 @@ public class TWSpawnersPlugin extends JavaPlugin {
         FileConfiguration config = getConfig();
         int configVersion = config.getInt("config-version", 0);
 
-        if (configVersion < 2
-                && config.getInt("limits.max-spawn-per-cycle", 1000) == 1000) {
-            config.set("limits.max-spawn-per-cycle", 10000);
+        if (configVersion < 3) {
+            config.set("limits.max-spawn-per-cycle", null);
         }
 
         try (InputStream input = getResource("config.yml")) {
@@ -68,7 +67,7 @@ public class TWSpawnersPlugin extends JavaPlugin {
                     new InputStreamReader(input, StandardCharsets.UTF_8));
             config.setDefaults(defaults);
             config.options().copyDefaults(true);
-            config.set("config-version", Math.max(configVersion, 2));
+            config.set("config-version", Math.max(configVersion, 3));
             saveConfig();
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Não foi possível atualizar a configuração dos spawners.", e);

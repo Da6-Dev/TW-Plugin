@@ -50,10 +50,7 @@ public class SpawnerManager {
     private final Map<String, SpawnerType> spawnerTypes = new LinkedHashMap<>();
     private final Map<String, PlacedSpawner> placedSpawners = new ConcurrentHashMap<>();
     private final List<String> rankHierarchy;
-    private final int maxSpawnPerCycle;
     private final int maxEntitiesPerSpawner;
-    private final int maxStackPurchase;
-    private final long maxSpawnerStack;
     private final long maxOwnedSpawners;
     private final long maxSpawnersPerPlot;
     private final long maxPendingPhysical;
@@ -73,14 +70,8 @@ public class SpawnerManager {
         this.rankHierarchy = TWCorePlugin.getInstance().getRankHierarchy();
         ConfigurationSection limits = plugin.getConfig().getConfigurationSection("limits");
         if (limits == null) throw new IllegalArgumentException("Configuração inválida: seção limits ausente.");
-        this.maxSpawnPerCycle = TWConfigValidation.requireIntRange(plugin, "limits.max-spawn-per-cycle",
-                limits.getInt("max-spawn-per-cycle", 10000), 1, 10000);
         this.maxEntitiesPerSpawner = TWConfigValidation.requireIntRange(plugin, "limits.max-entities-per-spawner",
                 limits.getInt("max-entities-per-spawner", 32), 1, 100);
-        this.maxStackPurchase = TWConfigValidation.requireIntRange(plugin, "limits.max-stack-purchase",
-                limits.getInt("max-stack-purchase", 1000), 1, 100000);
-        this.maxSpawnerStack = TWConfigValidation.requireIntRange(plugin, "limits.max-spawner-stack",
-                limits.getInt("max-spawner-stack", 1_000_000), 1, Integer.MAX_VALUE);
         this.maxOwnedSpawners = TWConfigValidation.requireIntRange(plugin, "limits.max-owned-spawners",
                 limits.getInt("max-owned-spawners", 100), 1, Integer.MAX_VALUE);
         this.maxSpawnersPerPlot = TWConfigValidation.requireIntRange(plugin, "limits.max-spawners-per-plot",
@@ -189,7 +180,7 @@ public class SpawnerManager {
 
                 if (nowSec - spawner.getLastSpawnTime() >= realCycleSeconds) {
                     spawner.setLastSpawnTime(nowSec);
-                    long spawnAmount = cappedSpawnAmount(spawner);
+                    long spawnAmount = SpawnerSpawnMath.amount(spawner.getStackAmount(), spawner.getAmountLevel());
                     if (spawnAmount <= 0L) return;
 
                     if (spawner.isVirtualMode()) {
@@ -237,9 +228,6 @@ public class SpawnerManager {
                 plugin.getHologramManager().updateOrCreateHologram(spawner, type);
             }
 
-            private long cappedSpawnAmount(PlacedSpawner spawner) {
-                return SpawnerSpawnMath.amount(spawner.getStackAmount(), spawner.getAmountLevel(), maxSpawnPerCycle);
-            }
         }.runTaskTimer(plugin, 20L, 20L);
 
         new BukkitRunnable() {
@@ -327,7 +315,8 @@ public class SpawnerManager {
 
     public boolean spawnOrStackEntity(Location spawnerLoc, SpawnerType type, long amountToAdd, int lootLevel) {
         if (amountToAdd < 1L) return false;
-        Location spawnPoint = spawnerLoc.clone().add(1.5, 0.0, 0.5);
+        Location spawnPoint = getMobSpawnLocation(spawnerLoc);
+        if (spawnPoint == null) return false;
         int matchingEntities = 0;
         LivingEntity stackTarget = null;
         for (Entity nearby : spawnPoint.getWorld().getNearbyEntities(spawnPoint, 6, 4, 6)) {
@@ -353,6 +342,11 @@ public class SpawnerManager {
         entity.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, Integer.MAX_VALUE, 250, false, false));
         updateEntityStack(entity, type, amountToAdd, lootLevel, spawnerLoc);
         return true;
+    }
+
+    public Location getMobSpawnLocation(Location spawnerLoc) {
+        if (spawnerLoc == null || spawnerLoc.getWorld() == null) return null;
+        return spawnerLoc.clone().add(1.5, 0.0, 0.5);
     }
 
     public void updateEntityStack(LivingEntity entity, SpawnerType type, long stack, int lootLevel, Location anchor) {
@@ -514,6 +508,83 @@ public class SpawnerManager {
         return item;
     }
 
+    public long giveSoulItems(Player player, long amount) {
+        if (player == null || amount < 0L) {
+            throw new IllegalArgumentException("Jogador e quantidade de almas são obrigatórios.");
+        }
+        if (amount == 0L) return 0L;
+
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        long total = amount;
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            Long legacyAmount = getLegacySoulAmount(item);
+            if (legacyAmount == null) continue;
+            total = Math.addExact(total, Math.multiplyExact(legacyAmount, (long) item.getAmount()));
+            contents[slot] = null;
+        }
+
+        ItemStack soul = createSoulItem();
+        long remaining = total;
+        int maxStack = Math.min(soul.getMaxStackSize(), player.getInventory().getMaxStackSize());
+        for (int slot = 0; slot < contents.length && remaining > 0L; slot++) {
+            ItemStack existing = contents[slot];
+            if (existing == null || !existing.isSimilar(soul)) continue;
+            int space = Math.max(0, maxStack - existing.getAmount());
+            int added = (int) Math.min((long) space, remaining);
+            existing.setAmount(existing.getAmount() + added);
+            remaining -= added;
+        }
+        for (int slot = 0; slot < contents.length && remaining > 0L; slot++) {
+            if (contents[slot] != null) continue;
+            int added = (int) Math.min((long) maxStack, remaining);
+            ItemStack stack = soul.clone();
+            stack.setAmount(added);
+            contents[slot] = stack;
+            remaining -= added;
+        }
+        player.getInventory().setStorageContents(contents);
+        return remaining;
+    }
+
+    public ItemStack createSoulItem() {
+        ItemStack item = new ItemStack(Material.NETHER_STAR, 1);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName("§d§lAlma de Monstro");
+        meta.setLore(Arrays.asList(
+                "§7Uma essência raríssima dropada",
+                "§7pelos monstros nos spawners.",
+                "§7Usa-a para trocar por itens místicos!"
+        ));
+        item.setItemMeta(meta);
+        Map<String, Object> tags = new HashMap<>();
+        tags.put("tw_spawner_soul", true);
+        return TWItemTags.set(item, tags);
+    }
+
+    private Long getLegacySoulAmount(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()
+                || !ChatColor.stripColor(meta.getDisplayName()).equals("Alma de Monstro")
+                || TWItemTags.getBoolean(item, "tw_spawner_soul", false)
+                || !meta.hasLore()) return null;
+        for (String line : meta.getLore()) {
+            String plain = ChatColor.stripColor(line);
+            if (plain == null || !plain.startsWith("Quantia:")) continue;
+            String value = plain.substring("Quantia:".length()).trim();
+            if (value.endsWith("x")) value = value.substring(0, value.length() - 1).trim();
+            try {
+                long legacyAmount = Long.parseLong(value);
+                return legacyAmount > 0L ? legacyAmount : null;
+            } catch (NumberFormatException e) {
+                plugin.getLogger().warning("Item antigo de alma com quantidade inválida no inventário: " + value);
+                return null;
+            }
+        }
+        return null;
+    }
+
     public PlacedSpawner getSpawnerAt(Location loc) { return placedSpawners.get(PlacedSpawner.toKey(loc)); }
 
     public PlacedSpawner findNearbySameSpawner(Location center, UUID owner, String typeId, int radius) {
@@ -587,10 +658,7 @@ public class SpawnerManager {
 
     public Map<String, SpawnerType> getSpawnerTypes() { return spawnerTypes; }
     public Map<String, PlacedSpawner> getPlacedSpawners() { return placedSpawners; }
-    public int getMaxStackPurchase() { return maxStackPurchase; }
-    public long getMaxSpawnerStack() { return maxSpawnerStack; }
     public long getMaxPendingPhysical() { return maxPendingPhysical; }
-    public int getMaxSpawnPerCycle() { return maxSpawnPerCycle; }
 
     public boolean upgradeSpawner(PlacedSpawner spawner, TWUser user, String upgrade, long cost) {
         if (spawner == null || user == null || cost < 0L
@@ -693,8 +761,7 @@ public class SpawnerManager {
     }
 
     public boolean canPlaceStack(Player player, Location location, long amount, boolean merging) {
-        if (player == null || location == null || location.getWorld() == null || amount < 1L
-                || amount > maxSpawnerStack) return false;
+        if (player == null || location == null || location.getWorld() == null || amount < 1L) return false;
         long owned = placedSpawners.values().stream()
                 .filter(spawner -> spawner.getOwnerUuid().equals(player.getUniqueId()))
                 .count();

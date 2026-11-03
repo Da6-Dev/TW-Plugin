@@ -59,6 +59,13 @@ public class RankupCommand implements CommandExecutor {
 
         if (balance >= cost) {
             if (user.removeBalance(cost)) {
+                if (!plugin.deliverMailRewards(player, nextRank)) {
+                    user.addBalance(cost);
+                    TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
+                    player.sendMessage(ChatColor.RED + "O rankup foi cancelado: a recompensa não chegou ao correio. "
+                            + "O valor foi devolvido; contacta a equipa.");
+                    return true;
+                }
                 user.setRankId(nextRank);
 
                 // Sincronização com o LuckPerms

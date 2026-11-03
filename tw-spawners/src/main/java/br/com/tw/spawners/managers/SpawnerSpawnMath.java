@@ -5,13 +5,12 @@ public final class SpawnerSpawnMath {
     private SpawnerSpawnMath() {
     }
 
-    public static long amount(long stackAmount, int amountLevel, long maxPerCycle) {
-        if (stackAmount < 0L || amountLevel < 0 || maxPerCycle < 1L) {
+    public static long amount(long stackAmount, int amountLevel) {
+        if (stackAmount < 0L || amountLevel < 0) {
             throw new IllegalArgumentException("Valores inválidos para calcular a geração do spawner.");
         }
         if (stackAmount == 0L || amountLevel == 0) return 0L;
-        if (stackAmount > maxPerCycle / amountLevel) return maxPerCycle;
-        return stackAmount * amountLevel;
+        return Math.multiplyExact(stackAmount, (long) amountLevel);
     }
 
     public static long sampleBinomial(long trials, double probability, java.util.Random random) {

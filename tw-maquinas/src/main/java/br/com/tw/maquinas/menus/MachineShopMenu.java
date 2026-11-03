@@ -6,6 +6,7 @@ import br.com.tw.core.menus.TWConfirmationMenu;
 import br.com.tw.core.menus.TWMenu;
 import br.com.tw.core.utils.TWFormat;
 import br.com.tw.maquinas.TWMaquinasPlugin;
+import br.com.tw.maquinas.listeners.MachineListener;
 import br.com.tw.maquinas.managers.MachineManager;
 import br.com.tw.maquinas.models.MachineType;
 import org.bukkit.Bukkit;
@@ -54,8 +55,7 @@ public class MachineShopMenu implements TWMenu {
         ItemStack header = MachineMenuStyle.button(Material.EMERALD,
                 "§b§lTW NETWORK §8» §fFábrica de Máquinas",
                 "§7Saldo disponível: §a$" + TWFormat.formatarDinheiro(user == null ? 0.0 : user.getBalance()),
-                "§7Máquinas no terreno: §e" + manager.countMachinesInPlotAt(player.getLocation())
-                        + "§7/§e" + manager.getMaxMachinesPerPlot(),
+                "§7Sem limite de máquinas por terreno.",
                 "§8Produção pausada quando o terreno descarrega.");
         inventory.setItem(4, header);
 
@@ -79,8 +79,7 @@ public class MachineShopMenu implements TWMenu {
                             + " §7a cada §f" + type.getCycleSeconds() + "s",
                     "",
                     unlocked ? "§eClique esquerdo §8» §fComprar 1" : "§cRank insuficiente",
-                    unlocked ? "§6Clique direito §8» §fComprar 10" : "",
-                    unlocked ? "§bShift + clique §8» §fComprar até 64" : "",
+                    unlocked ? "§6Clique direito §8» §fEscolher quantidade" : "",
                     "§8━━━━━━━━━━━━━━━━"
             );
             inventory.setItem(slot, MachineMenuStyle.button(type.getMaterial(), type.getDisplayName(), lore));
@@ -150,22 +149,15 @@ public class MachineShopMenu implements TWMenu {
                 return;
             }
 
-            long amount = 1;
-            if (event.isShiftClick()) {
-                amount = type.getBuyCost() <= 0.0 ? 64L
-                        : Math.min(64L, Math.max(1L, (long) Math.floor(user.getBalance() / type.getBuyCost())));
-            } else if (event.isRightClick()) {
-                amount = 10;
-            }
-
-            final long purchaseAmount = amount;
-            double totalCost = type.getBuyCost() * purchaseAmount;
-            if (!Double.isFinite(totalCost)) {
-                player.sendMessage(ChatColor.RED + "O valor desta compra excede o limite permitido.");
+            if (event.isRightClick()) {
+                player.closeInventory();
+                MachineListener.pendingPurchases.put(player.getUniqueId(), type);
+                player.sendMessage("§eDigite no chat a quantidade de §f" + type.getDisplayName()
+                        + " §eque deseja comprar (ou 'cancelar' para sair).");
                 return;
             }
-            confirmIfExpensive(totalCost, "Comprar " + purchaseAmount + "x " + type.getDisplayName(),
-                    () -> purchaseMachine(type, purchaseAmount, totalCost));
+
+            purchaseMachine(type, 1L);
         }
     }
 
@@ -178,7 +170,26 @@ public class MachineShopMenu implements TWMenu {
                 () -> purchaseFuel(units, price));
     }
 
-    private void purchaseMachine(MachineType type, long amount, double totalCost) {
+    public void purchaseMachine(MachineType type, long amount) {
+        if (user == null || type == null || amount < 1L) {
+            player.sendMessage(ChatColor.RED + "Não foi possível iniciar esta compra.");
+            return;
+        }
+        if (!manager.hasRequiredRank(user.getRankId(), user.getPrestigeId(), type.getRequiredRank())) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(ChatColor.RED + "Precisas do rank " + type.getRequiredRank() + " para comprar esta máquina!");
+            return;
+        }
+        double totalCost = type.getBuyCost() * amount;
+        if (!Double.isFinite(totalCost) || totalCost < 0.0) {
+            player.sendMessage(ChatColor.RED + "O valor desta compra excede o limite permitido.");
+            return;
+        }
+        confirmIfExpensive(totalCost, "Comprar " + amount + "x " + type.getDisplayName(),
+                () -> completeMachinePurchase(type, amount, totalCost));
+    }
+
+    private void completeMachinePurchase(MachineType type, long amount, double totalCost) {
         if (user.removeBalance(totalCost)) {
             if (!persistBalanceChange(totalCost)) return;
             if (!giveItem(manager.createMachineItem(type, amount))) {

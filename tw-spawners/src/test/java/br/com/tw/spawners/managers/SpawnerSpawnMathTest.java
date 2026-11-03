@@ -11,14 +11,14 @@ import static org.junit.Assert.fail;
 public class SpawnerSpawnMathTest {
 
     @Test
-    public void stackOfTenThousandGeneratesTenThousandWhenConfigured() {
-        assertEquals(10_000L, SpawnerSpawnMath.amount(10_000L, 1, 10_000L));
+    public void stackOfTwentyThousandGeneratesAllTwentyThousandUnits() {
+        assertEquals(20_000L, SpawnerSpawnMath.amount(20_000L, 1));
     }
 
     @Test
-    public void generationLimitIsAppliedAfterAmountUpgrade() {
-        assertEquals(10_000L, SpawnerSpawnMath.amount(9_000L, 2, 10_000L));
-        assertEquals(7_500L, SpawnerSpawnMath.amount(2_500L, 3, 10_000L));
+    public void amountUpgradeMultipliesTheFullStackWithoutCycleCap() {
+        assertEquals(18_000L, SpawnerSpawnMath.amount(9_000L, 2));
+        assertEquals(7_500L, SpawnerSpawnMath.amount(2_500L, 3));
     }
 
     @Test
@@ -44,10 +44,20 @@ public class SpawnerSpawnMathTest {
     @Test
     public void rejectsInvalidGenerationInputs() {
         try {
-            SpawnerSpawnMath.amount(-1L, 1, 10_000L);
+            SpawnerSpawnMath.amount(-1L, 1);
             fail("Esperava erro para stack negativo.");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("inválidos"));
+        }
+    }
+
+    @Test
+    public void rejectsGenerationOverflowInsteadOfSilentlyCapping() {
+        try {
+            SpawnerSpawnMath.amount(Long.MAX_VALUE, 2);
+            fail("Esperava erro para overflow na geração.");
+        } catch (ArithmeticException expected) {
+            assertTrue(expected.getMessage() != null);
         }
     }
 }

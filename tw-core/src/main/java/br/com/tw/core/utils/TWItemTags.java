@@ -62,8 +62,20 @@ public final class TWItemTags {
 
     public static long getLong(ItemStack item, String key, long fallback) {
         if (isEmpty(item)) return fallback;
-        Long value = requireMeta(item).getPersistentDataContainer().get(key(key), PersistentDataType.LONG);
-        return value == null ? fallback : value;
+        PersistentDataContainer data = requireMeta(item).getPersistentDataContainer();
+        return getLong(data, key(key), fallback);
+    }
+
+    static long getLong(PersistentDataContainer data, NamespacedKey key, long fallback) {
+        if (data.has(key, PersistentDataType.LONG)) {
+            Long value = data.get(key, PersistentDataType.LONG);
+            if (value != null) return value;
+        }
+        if (data.has(key, PersistentDataType.INTEGER)) {
+            Integer value = data.get(key, PersistentDataType.INTEGER);
+            if (value != null) return value.longValue();
+        }
+        return fallback;
     }
 
     public static int getInt(ItemStack item, String key, int fallback) {

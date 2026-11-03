@@ -78,7 +78,7 @@ public final class CrateReward {
         if (effect != null && !effect.trim().isEmpty()) {
             Map<String, Object> tags = new HashMap<>();
             tags.put("tw_crate_effect", effect);
-            tags.put("tw_crate_charges", charges);
+            tags.put("tw_crate_charges", (long) charges);
             tags.put("tw_crate_instance", java.util.UUID.randomUUID().toString());
             return TWItemTags.set(item, tags);
         }

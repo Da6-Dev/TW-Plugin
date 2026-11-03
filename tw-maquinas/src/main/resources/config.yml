@@ -7,8 +7,6 @@ confirmation:
 
 machine-rules:
   plot-world: "terrenos"
-  max-machines-per-plot: 25
-  max-stack-size: 1000000
   max-fuel-cycles: 10000000
   max-upgrades:
     speed: 19

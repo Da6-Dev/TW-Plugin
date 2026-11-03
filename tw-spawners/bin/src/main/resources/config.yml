@@ -1,0 +1,63 @@
+config-version: 2
+
+spawners:
+  PIG:
+    nome: "&dGerador de Porcos"
+    entidade: "PIG"
+    rank-necessario: "CARVAO"
+    custo-compra: 100000.0
+    valor-por-kill: 800.0
+    chance-token: 0.15
+  COW:
+    nome: "&7Gerador de Vacas"
+    entidade: "COW"
+    rank-necessario: "NEVE"
+    custo-compra: 2500000.0
+    valor-por-kill: 18000.0
+    chance-token: 0.20
+  SPIDER:
+    nome: "&8Gerador de Aranhas"
+    entidade: "SPIDER"
+    rank-necessario: "SINO"
+    custo-compra: 65000000.0
+    valor-por-kill: 450000.0
+    chance-token: 0.25
+  ZOMBIE:
+    nome: "&2Gerador de Zombies"
+    entidade: "ZOMBIE"
+    rank-necessario: "BISCOITO"
+    custo-compra: 1200000000.0
+    valor-por-kill: 9000000.0
+    chance-token: 0.30
+  BLAZE:
+    nome: "&6Gerador de Blazes"
+    entidade: "BLAZE"
+    rank-necessario: "DUENDE"
+    custo-compra: 40000000000.0
+    valor-por-kill: 320000000.0
+    chance-token: 0.40
+  IRON_GOLEM:
+    nome: "&f&lGerador de Iron Golem"
+    entidade: "IRON_GOLEM"
+    rank-necessario: "RENA"
+    custo-compra: 1500000000000.0
+    valor-por-kill: 12000000000.0
+    chance-token: 0.50
+
+limits:
+  # O limite afeta unidades representadas pelo stack, não entidades Bukkit individuais.
+  max-spawn-per-cycle: 10000
+  max-entities-per-spawner: 32
+  max-stack-purchase: 1000
+  max-spawner-stack: 1000000
+  max-owned-spawners: 100
+  max-spawners-per-plot: 25
+  plot-world: "terrenos"
+  max-pending-physical: 100000
+  autosave-seconds: 60
+  max-speed-level: 19
+  max-loot-level: 100
+  max-amount-level: 10000
+
+confirmation:
+  price-threshold: 250000.0

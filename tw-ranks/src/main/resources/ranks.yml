@@ -22,15 +22,19 @@ ranks:
     next: "DUENDE"
     cost: 500000000.0
     broadcast: false
-    commands:
-      - "give %player% diamond 1"
+    commands: []
+    mail-rewards:
+      - material: DIAMOND
+        amount: 1
   DUENDE:
     prefix: "&a[Duende]"
     next: "RENA"
     cost: 15000000000.0
     broadcast: true
-    commands:
-      - "give %player% emerald 5"
+    commands: []
+    mail-rewards:
+      - material: EMERALD
+        amount: 5
   RENA:
     prefix: "&c[Rena]"
     next: "TRENO"
