@@ -8,7 +8,6 @@ import br.com.tw.core.utils.TWMenuFrame;
 import br.com.tw.minas.TWMinasPlugin;
 import br.com.tw.minas.managers.CartinhasManager;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.enchantments.Enchantment;
@@ -31,15 +30,22 @@ public class CartinhasMenu implements TWMenu {
     public CartinhasMenu(Player player) {
         this.player = player;
         this.user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
-        this.inventory = Bukkit.createInventory(this, 36, ChatColor.LIGHT_PURPLE + "Cartinhas de Missões");
+        this.inventory = Bukkit.createInventory(this, 27, TWMenuFrame.PREFIX_TITULO + "MISSÕES DE MINERAÇÃO");
         setupItems();
     }
 
     private void setupItems() {
         inventory.clear();
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, createGlass(2));
-        }
+
+        // Slot 4: Cabeçalho explicativo
+        inventory.setItem(4, createItem(Material.BOOK, "§b§lCARTINHAS DE MISSÕES",
+                "§7Cumpra as missões diárias nas minas para",
+                "§7resgatar Tokens e Dinheiro diretamente na sua conta.",
+                "",
+                "§7Missões Ativas: §a3 Cartinhas",
+                "§7Troca: §e50 Tokens (Botão Direito)",
+                "",
+                "§8TW Network • Mineração"));
 
         if (user != null) {
             List<CartinhasManager.MissionSlot> missions = TWMinasPlugin.getInstance().getCartinhasManager().getMissions(user);
@@ -56,38 +62,38 @@ public class CartinhasMenu implements TWMenu {
 
                 ItemStack paper = new ItemStack(done ? Material.MAP : Material.PAPER);
                 ItemMeta meta = paper.getItemMeta();
-                meta.setDisplayName(cardNames[i]);
+                if (meta != null) {
+                    meta.setDisplayName(cardNames[i]);
 
-                meta.setLore(Arrays.asList(
-                        "§7Missão: §f" + m.type.getTitle(),
-                        "§7Objetivo: §e" + m.type.getDescription(m.target),
-                        "",
-                        "§7Progresso: " + (done ? "§a§lCONCLUÍDA!" : "§f" + m.progress + " §7/ §f" + m.target + " " + buildBar(m.progress, m.target)),
-                        "",
-                        "§7Recompensas:",
-                        " §b• +" + TWFormat.formatarDinheiro(m.rewardTokens) + " Tokens",
-                        " §2• +$" + TWFormat.formatarDinheiro(m.rewardMoney),
-                        "",
-                        done ? "§a§lCLICA PARA RESGATAR RECOMPENSA!" : "§eBotão Direito: §7Sortear outra (50 Tokens)"
-                ));
+                    meta.setLore(Arrays.asList(
+                            "§7Missão: §f" + m.type.getTitle(),
+                            "§7Objetivo: §e" + m.type.getDescription(m.target),
+                            "",
+                            "§7Progresso: " + (done ? "§a§lCONCLUÍDA!" : "§f" + m.progress + " §7/ §f" + m.target + " " + buildBar(m.progress, m.target)),
+                            "§7Recompensas: §b+" + TWFormat.formatarDinheiro(m.rewardTokens) + " Tokens §8| §2+$" + TWFormat.formatarDinheiro(m.rewardMoney),
+                            "",
+                            done ? "§a▶ Clique para resgatar recompensa" : "§e▶ Botão Direito: sortear outra (50 Tokens)"
+                    ));
 
-                if (done) {
-                    meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-                    meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                    if (done) {
+                        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                    }
+
+                    paper.setItemMeta(meta);
                 }
-
-                paper.setItemMeta(meta);
                 inventory.setItem(slots[i], paper);
             }
         }
 
-        ItemStack back = new ItemStack(Material.OAK_DOOR);
-        ItemMeta bMeta = back.getItemMeta();
-        bMeta.setDisplayName("§cVoltar");
-        bMeta.setLore(Arrays.asList("§7Retornar à Central."));
-        back.setItemMeta(bMeta);
-        inventory.setItem(31, back);
-        TWMenuFrame.apply(inventory);
+        // Botões Universais (Slot 18 Voltar para a Central de Minas, Slot 22 Fechar)
+        inventory.setItem(18, createItem(Material.ARROW, "§e➔ §lVoltar à Central",
+                "§7Retorne para a Central de Mineração.",
+                "",
+                "§e▶ Clique para voltar"));
+        inventory.setItem(22, TWMenuFrame.closeButton());
+
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     private String buildBar(long current, long max) {
@@ -105,9 +111,14 @@ public class CartinhasMenu implements TWMenu {
         if (user == null) return;
         int slot = event.getSlot();
 
-        if (slot == 31) {
+        if (slot == 18) {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             new MinaMainMenu(player).open();
+            return;
+        }
+
+        if (slot == 22) {
+            player.closeInventory();
             return;
         }
 
@@ -126,7 +137,14 @@ public class CartinhasMenu implements TWMenu {
 
     public void open() { player.openInventory(inventory); }
 
-    private ItemStack createGlass(int data) {
-        return TWMenuFrame.stainedGlassPane(data);
+    private ItemStack createItem(Material mat, String name, String... lore) {
+        ItemStack item = new ItemStack(mat);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 }

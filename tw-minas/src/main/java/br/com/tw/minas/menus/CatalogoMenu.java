@@ -25,15 +25,15 @@ public class CatalogoMenu implements TWMenu {
 
     public CatalogoMenu(Player player) {
         this.player = player;
-        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "CENTRAL DE MINAS");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "CATÁLOGO DE MINAS");
 
         initWarps();
         setupItems();
     }
 
     private void initWarps() {
-        // Linha 2 e 3: Jornada Principal
-        warpsMap.put(10, new WarpInfo("carvao", "realmines.carvao.break", Material.COAL_BLOCK, "§8[§0Carvão§8]"));
+        // Linha 2 e 3: Jornada Principal (10 Ranks)
+        warpsMap.put(10, new WarpInfo("carvao", "realmines.carvao.break", Material.COAL_BLOCK, "§8[§fCarvão§8]"));
         warpsMap.put(11, new WarpInfo("neve", "realmines.neve.break", Material.SNOW_BLOCK, "§8[§fNeve§8]"));
         warpsMap.put(12, new WarpInfo("sino", "realmines.sino.break", Material.GOLD_BLOCK, "§8[§eSino§8]"));
         warpsMap.put(13, new WarpInfo("biscoito", "realmines.biscoito.break", Material.BROWN_TERRACOTTA, "§8[§6Biscoito§8]"));
@@ -44,12 +44,12 @@ public class CatalogoMenu implements TWMenu {
         warpsMap.put(22, new WarpInfo("estrela", "realmines.estrela.break", Material.GLOWSTONE, "§8[§e§lEstrela§8]"));
         warpsMap.put(23, new WarpInfo("noel", "realmines.noel.break", Material.EMERALD_BLOCK, "§8[§c§lNoel§8]"));
 
-        // Linha 4: VIPs
+        // Linha 4: VIPs (3 Minas)
         warpsMap.put(30, new WarpInfo("vip_festivo", "realmines.vip_festivo.break", Material.LIME_WOOL, "§a[VIP Festivo]"));
         warpsMap.put(31, new WarpInfo("vip_nevasca", "realmines.vip_nevasca.break", Material.LIGHT_BLUE_WOOL, "§b[VIP Nevasca]"));
         warpsMap.put(32, new WarpInfo("vip_polar", "realmines.vip_polar.break", Material.RED_WOOL, "§c[VIP Polar]"));
 
-        // Linha 5: Prestígios
+        // Linha 5: Prestígios (3 Minas)
         warpsMap.put(38, new WarpInfo("grinch", "realmines.grinch.break", Material.EMERALD_BLOCK, "§2Prestígio I [Grinch]"));
         warpsMap.put(39, new WarpInfo("yeti", "realmines.yeti.break", Material.DARK_PRISMARINE, "§bPrestígio II [Yeti]"));
         warpsMap.put(40, new WarpInfo("krampus", "realmines.krampus.break", Material.BEACON, "§4Prestígio III [Krampus]"));
@@ -59,27 +59,55 @@ public class CatalogoMenu implements TWMenu {
     }
 
     private void setupItems() {
-        // Neve no topo para decoração
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, createItem(Material.WHITE_STAINED_GLASS_PANE, " "));
-        }
+        // Slot 4: Cabeçalho explicativo
+        inventory.setItem(4, createItem(Material.COMPASS, "§b§lSETOR DE MINAS",
+                "§7Explore o catálogo completo de minas do servidor.",
+                "",
+                "§7Total: §f16 Minas Disponíveis",
+                "§7Acesso: §eProgresso de Ranks, VIPs e Prestígios",
+                "",
+                "§8TW Network • Mineração"));
 
-        // Renderiza cada mina dinamicamente verificando as permissões
+        // Renderiza cada mina verificando as permissões dinamicamente
         for (Map.Entry<Integer, WarpInfo> entry : warpsMap.entrySet()) {
             int slot = entry.getKey();
             WarpInfo info = entry.getValue();
 
-            // A Mina PvP não tem permissão exigida
-            if (info.perm.isEmpty() || player.hasPermission(info.perm)) {
-                inventory.setItem(slot, createItem(info.mat, info.name, "", "§aClica para viajar!"));
+            boolean unlocked = info.perm.isEmpty() || player.hasPermission(info.perm);
+            if (unlocked) {
+                inventory.setItem(slot, createItem(info.mat, info.name + " §a✔",
+                        "§7Mina de recursos do setor " + info.name + ".",
+                        "",
+                        "§7Status: §aDesbloqueada",
+                        "§7Acesso: §fLiberado para o seu nível",
+                        "",
+                        "§a▶ Clique para viajar"));
             } else {
-                inventory.setItem(slot, createItem(Material.GRAY_DYE, info.name, "", "§cMina Bloqueada!", "§7Evolui para aceder."));
+                inventory.setItem(slot, createItem(Material.GRAY_DYE, info.name + " §c🔒",
+                        "§7Mina de recursos bloqueada para o seu nível.",
+                        "",
+                        "§7Status: §cBloqueada",
+                        "§7Requisito: §eEvolua seu Rank ou VIP",
+                        "",
+                        "§c▶ Requisito não atingido"));
             }
         }
 
-        inventory.setItem(48, createItem(Material.OAK_DOOR, "§eVoltar à Central", "§7Retornar ao menu de mineração."));
-        inventory.setItem(45, TWMenuFrame.backButton());
+        // Slot 48: Atalho para o Menu Principal
+        inventory.setItem(48, createItem(Material.NETHER_STAR, "§b§lMenu Principal",
+                "§7Retorne ao Hub Central de menus do servidor.",
+                "",
+                "§7Destino: §f/menu",
+                "",
+                "§b▶ Clique para ir ao menu"));
+
+        // Botões Universais (Slot 45 Voltar para a Central de Minas, Slot 49 Fechar)
+        inventory.setItem(45, createItem(Material.ARROW, "§e➔ §lVoltar à Central",
+                "§7Retorne para a Central de Mineração.",
+                "",
+                "§e▶ Clique para voltar"));
         inventory.setItem(49, TWMenuFrame.closeButton());
+
         TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
@@ -87,17 +115,24 @@ public class CatalogoMenu implements TWMenu {
     public void onClick(InventoryClickEvent event) {
         int slot = event.getSlot();
 
-        if (slot == 48) {
+        if (slot == 45) {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             new MinaMainMenu(player).open();
             return;
         }
-        if (slot == 45 || slot == 49) {
-            TWMenuFrame.handleNavigationClick(player, slot, 54);
+
+        if (slot == 48) {
+            player.closeInventory();
+            player.performCommand("menu");
             return;
         }
 
-        // Se clicou numa mina bloqueada (Corante Cinza)
+        if (slot == 49) {
+            player.closeInventory();
+            return;
+        }
+
+        // Se clicou numa mina bloqueada
         if (event.getCurrentItem() != null && event.getCurrentItem().getType() == Material.GRAY_DYE) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             player.sendMessage(ChatColor.RED + "Não tens Rank/VIP suficiente para entrar nesta mina!");
@@ -144,13 +179,14 @@ public class CatalogoMenu implements TWMenu {
     private ItemStack createItem(Material mat, String name, String... lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
-        meta.setLore(Arrays.asList(lore));
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 
-    // Estrutura de dados para guardar a configuração de cada botão
     private static class WarpInfo {
         String mineName;
         String perm;

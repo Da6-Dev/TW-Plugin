@@ -3,6 +3,7 @@ package br.com.tw.minas.menus;
 import br.com.tw.core.TWCorePlugin;
 import br.com.tw.core.data.TWUser;
 import br.com.tw.core.menus.TWMenu;
+import br.com.tw.core.utils.TWFormat;
 import br.com.tw.core.utils.TWMenuFrame;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -27,17 +28,20 @@ public class OficinaMenu implements TWMenu {
     public OficinaMenu(Player player) {
         this.player = player;
         this.user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
-        this.inventory = Bukkit.createInventory(this, 45, ChatColor.RED + "§lOficina dos Duendes");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "OFICINA DE MINAS");
         initSkillsMap();
         setupItems();
     }
 
     private void initSkillsMap() {
+        // Linha 2
         skillsMap.put(11, new SkillInfo("fortuna", 100));
         skillsMap.put(12, new SkillInfo("cacador", 150));
         skillsMap.put(13, new SkillInfo("sabedoria", 200));
         skillsMap.put(14, new SkillInfo("sorteiro", 500));
         skillsMap.put(15, new SkillInfo("jackpot", 1000));
+
+        // Linha 3
         skillsMap.put(20, new SkillInfo("explosao", 2000));
         skillsMap.put(21, new SkillInfo("broca", 2500));
         skillsMap.put(22, new SkillInfo("laser", 3000));
@@ -48,31 +52,44 @@ public class OficinaMenu implements TWMenu {
 
     private void setupItems() {
         inventory.clear();
-        TWMenuFrame.apply(inventory);
         if (user == null) return;
 
-        // Lendo diretamente do TWUser
         int level = user.getPickaxeLevel();
         double xp = user.getPickaxeXp();
 
+        // Slot 4: Picareta e estatísticas
         inventory.setItem(4, createItem(Material.DIAMOND_PICKAXE, "§b§lA Tua Picareta",
-                "§7Nível: §f" + level,
-                "§7XP: §a" + (int)xp + " §8/ §a" + (level * 1000),
-                "§7Tokens Disponíveis: §b" + br.com.tw.core.utils.TWFormat.formatarDinheiro(user.getTokens())));
+                "§7Acompanhe o nível e melhorias da sua ferramenta.",
+                "",
+                "§7Nível Atual: §f" + level,
+                "§7Progresso de XP: §e" + (int)xp + " §8/ §e" + (level * 1000),
+                "§7Tokens Disponíveis: §b" + TWFormat.formatarDinheiro(user.getTokens()),
+                "",
+                "§8TW Network • Oficina"));
 
-        renderSkill(11, "fortuna", Material.GOLD_NUGGET, "§eFortuna", "Aumenta o dinheiro ganho.");
-        renderSkill(12, "cacador", Material.SNOWBALL, "§bCaçador de Flocos", "Aumenta o drop de Tokens.");
-        renderSkill(13, "sabedoria", Material.EXPERIENCE_BOTTLE, "§aSabedoria", "Aumenta o XP da Picareta.");
-        renderSkill(14, "sorteiro", Material.TRIPWIRE_HOOK, "§6Sorteiro", "Chance de achar Chaves.");
-        renderSkill(15, "jackpot", Material.EMERALD, "§a§lJackpot", "Dobra o dinheiro de um bloco.");
-        renderSkill(20, "explosao", Material.TNT, "§cExplosão 3x3", "Quebra blocos em volta.");
-        renderSkill(21, "broca", Material.PISTON, "§7Broca", "Destrói blocos para baixo.");
-        renderSkill(22, "laser", Material.BEACON, "§bLaser", "Destrói blocos em linha.");
-        renderSkill(23, "trator", Material.MINECART, "§8Trator", "Limpa a camada atual.");
-        renderSkill(24, "avalanche", Material.NETHER_STAR, "§4§lAvalanche", "O poder mais raro.");
-        renderSkill(25, "bateria", Material.REDSTONE, "§cBateria de Combo", "Aumenta o tempo do combo.");
+        // Habilidades Linha 2
+        renderSkill(11, "fortuna", Material.GOLD_NUGGET, "§eFortuna", "Aumenta a quantidade de dinheiro obtido.");
+        renderSkill(12, "cacador", Material.SNOWBALL, "§bCaçador de Flocos", "Aumenta a taxa de drop de Tokens.");
+        renderSkill(13, "sabedoria", Material.EXPERIENCE_BOTTLE, "§aSabedoria", "Acelera o ganho de XP da ferramenta.");
+        renderSkill(14, "sorteiro", Material.TRIPWIRE_HOOK, "§6Sorteiro", "Aumenta a chance de encontrar Chaves.");
+        renderSkill(15, "jackpot", Material.EMERALD, "§a§lJackpot", "Chance de dobrar os ganhos de um bloco.");
 
-        inventory.setItem(40, createItem(Material.OAK_DOOR, "§cVoltar", "§7Retornar à Central."));
+        // Habilidades Linha 3
+        renderSkill(20, "explosao", Material.TNT, "§cExplosão 3x3", "Detona os blocos ao redor em área 3x3.");
+        renderSkill(21, "broca", Material.PISTON, "§7Broca Perfuradora", "Destrói uma coluna de blocos para baixo.");
+        renderSkill(22, "laser", Material.BEACON, "§bLaser Concentrado", "Quebra blocos em linha reta à sua frente.");
+        renderSkill(23, "trator", Material.MINECART, "§8Trator Industrial", "Limpa a camada inteira ao minerar.");
+        renderSkill(24, "avalanche", Material.NETHER_STAR, "§4§lAvalanche Cósmica", "O poder lendário mais raro e potente.");
+        renderSkill(25, "bateria", Material.REDSTONE, "§cBateria de Combo", "Estende a duração do multiplicador de combo.");
+
+        // Botões Universais (Slot 45 Voltar para a Central de Minas, Slot 49 Fechar)
+        inventory.setItem(45, createItem(Material.ARROW, "§e➔ §lVoltar à Central",
+                "§7Retorne para a Central de Mineração.",
+                "",
+                "§e▶ Clique para voltar"));
+        inventory.setItem(49, TWMenuFrame.closeButton());
+
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     private void renderSkill(int slot, String id, Material mat, String name, String desc) {
@@ -81,17 +98,26 @@ public class OficinaMenu implements TWMenu {
         int cost = baseCost * (lvl + 1);
 
         inventory.setItem(slot, createItem(mat, name,
-                "§7" + desc, "",
+                "§7" + desc,
+                "",
                 "§7Nível Atual: §f" + lvl,
-                "§7Custo: §b" + br.com.tw.core.utils.TWFormat.formatarDinheiro(cost) + " Tokens",
-                "§aClica para evoluir!"));
+                "§7Custo de Upgrade: §b" + TWFormat.formatarDinheiro(cost) + " Tokens",
+                "",
+                "§a▶ Clique para evoluir"));
     }
 
     @Override
     public void onClick(InventoryClickEvent event) {
         int slot = event.getSlot();
-        if (slot == 40) {
+
+        if (slot == 45) {
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             new MinaMainMenu(player).open();
+            return;
+        }
+
+        if (slot == 49) {
+            player.closeInventory();
             return;
         }
 
@@ -101,9 +127,7 @@ public class OficinaMenu implements TWMenu {
             int cost = info.baseCost * (currentLvl + 1);
 
             if (user.removeTokens(cost)) {
-                user.upgradeSkill(info.id); // Melhora a habilidade direto no TWUser
-
-                // Salva no banco de dados para evitar perda em caso de crash
+                user.upgradeSkill(info.id);
                 TWCorePlugin.getInstance().getUserManager().saveUserAsync(user);
 
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 2f);
@@ -112,7 +136,7 @@ public class OficinaMenu implements TWMenu {
             } else {
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
                 long faltam = cost - user.getTokens();
-                player.sendMessage(ChatColor.RED + "Não tens Tokens suficientes! Faltam " + br.com.tw.core.utils.TWFormat.formatarDinheiro(faltam) + ".");
+                player.sendMessage(ChatColor.RED + "Não tens Tokens suficientes! Faltam " + TWFormat.formatarDinheiro(faltam) + ".");
             }
         }
     }
@@ -124,9 +148,11 @@ public class OficinaMenu implements TWMenu {
     private ItemStack createItem(Material mat, String name, String... lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
-        meta.setLore(Arrays.asList(lore));
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 

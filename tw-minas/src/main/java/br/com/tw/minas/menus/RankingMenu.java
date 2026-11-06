@@ -24,21 +24,39 @@ public class RankingMenu implements TWMenu {
 
     public RankingMenu(Player player) {
         this.player = player;
-        this.inventory = Bukkit.createInventory(this, 36, ChatColor.GOLD + "§lRanking dos Melhores");
+        this.inventory = Bukkit.createInventory(this, 27, TWMenuFrame.PREFIX_TITULO + "RANKING DE MINERADORES");
 
         // Coloca os itens de "A carregar..."
         setupLoadingItems();
 
-        // Puxa os dados reais de forma segura (sem travar o servidor)
+        // Puxa os dados reais de forma assíncrona
         loadRankingAsync();
     }
 
     private void setupLoadingItems() {
+        inventory.clear();
+
+        // Slot 4: Cabeçalho explicativo
+        inventory.setItem(4, createItem(Material.GOLD_BLOCK, "§e§lRANKING GLOBAL",
+                "§7Os mineradores mais dedicados e ativos da rede.",
+                "",
+                "§7Classificação: §fTop 3 Mineradores",
+                "§7Critério: §bBlocos Quebrados",
+                "",
+                "§8TW Network • Mineração"));
+
         inventory.setItem(11, createLoadingSkull("§e§l1º Lugar"));
         inventory.setItem(13, createLoadingSkull("§f§l2º Lugar"));
         inventory.setItem(15, createLoadingSkull("§6§l3º Lugar"));
-        inventory.setItem(31, createItem(Material.OAK_DOOR, "§cVoltar", "§7Retornar à Central."));
-        TWMenuFrame.apply(inventory);
+
+        // Botões Universais (Slot 18 Voltar para a Central de Minas, Slot 22 Fechar)
+        inventory.setItem(18, createItem(Material.ARROW, "§e➔ §lVoltar à Central",
+                "§7Retorne para a Central de Mineração.",
+                "",
+                "§e▶ Clique para voltar"));
+        inventory.setItem(22, TWMenuFrame.closeButton());
+
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     private void loadRankingAsync() {
@@ -56,7 +74,12 @@ public class RankingMenu implements TWMenu {
                         String nome = entry.getKey();
                         long blocos = entry.getValue();
                         inventory.setItem(slots[i], getPlayerSkull(nome, titulos[i],
-                                "§7Blocos Quebrados: §b" + String.format("%,d", blocos)));
+                                "§7Classificação no Rank de Mineração.",
+                                "",
+                                "§7Jogador: §f" + nome,
+                                "§7Blocos Quebrados: §b" + String.format("%,d", blocos),
+                                "",
+                                "§8TW Network • Top Mineradores"));
                         i++;
                     }
                 });
@@ -75,9 +98,13 @@ public class RankingMenu implements TWMenu {
     @Override
     public void onClick(InventoryClickEvent event) {
         int slot = event.getSlot();
-        if (slot == 31) {
+        if (slot == 18) {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             new MinaMainMenu(player).open();
+            return;
+        }
+        if (slot == 22) {
+            player.closeInventory();
         }
     }
 
@@ -91,28 +118,40 @@ public class RankingMenu implements TWMenu {
     private ItemStack createItem(Material mat, String name, String... lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
-        meta.setLore(Arrays.asList(lore));
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 
     private ItemStack createLoadingSkull(String titulo) {
         ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
-        meta.setDisplayName(titulo);
-        meta.setLore(Arrays.asList("§7A consultar o Banco de Dados..."));
-        skull.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(titulo);
+            meta.setLore(Arrays.asList(
+                    "§7A consultar o Banco de Dados...",
+                    "",
+                    "§7Aguarde alguns instantes...",
+                    "",
+                    "§8TW Network • Mineração"
+            ));
+            skull.setItemMeta(meta);
+        }
         return skull;
     }
 
     private ItemStack getPlayerSkull(String playerName, String titulo, String... lore) {
         ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
-        meta.setOwner(playerName);
-        meta.setDisplayName(titulo + " §7- §a" + playerName);
-        meta.setLore(Arrays.asList(lore));
-        skull.setItemMeta(meta);
+        if (meta != null) {
+            meta.setOwner(playerName);
+            meta.setDisplayName(titulo + " §7- §a" + playerName);
+            meta.setLore(Arrays.asList(lore));
+            skull.setItemMeta(meta);
+        }
         return skull;
     }
 }
