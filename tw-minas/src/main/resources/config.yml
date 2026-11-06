@@ -13,20 +13,20 @@ events:
   cleanup-interval-ticks: 20
 
 pvp:
-  world: mina_pvp
+  world: mina_pvp_winter
   allowed-origin-worlds:
     - world
     - world_nether
     - terrenos
   spawn:
-    x: 0.5
-    y: 101
-    z: 0.5
-    yaw: 0
-    pitch: 0
-    floor-y: 100
+    x: -64.0
+    y: 110.0
+    z: 16.0
+    yaw: 0.0
+    pitch: 0.0
+    floor-y: 109
   arena:
-    radius: 64
+    radius: 96
   session-save-interval-ticks: 100
   kits:
     basic:
