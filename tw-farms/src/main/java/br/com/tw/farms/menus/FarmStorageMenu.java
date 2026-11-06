@@ -36,7 +36,7 @@ public final class FarmStorageMenu implements TWMenu {
         this.manager = manager;
         this.selectedSilo = null;
         this.selectedType = null;
-        inventory = Bukkit.createInventory(this, 45, ChatColor.DARK_GREEN + "Armazém da Farm");
+        inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "CENTRAL AGRÍCOLA");
         setup();
     }
 
@@ -45,7 +45,7 @@ public final class FarmStorageMenu implements TWMenu {
         this.manager = manager;
         this.selectedSilo = silo;
         this.selectedType = type;
-        inventory = Bukkit.createInventory(this, 27, ChatColor.DARK_GREEN + "Gestão da Safra");
+        inventory = Bukkit.createInventory(this, 27, TWMenuFrame.PREFIX_TITULO + "GESTÃO DA SAFRA");
         setup();
     }
 
@@ -91,6 +91,9 @@ public final class FarmStorageMenu implements TWMenu {
                 "§7Guarda novamente os itens que",
                 "§7recolheste anteriormente do silo."));
         inventory.setItem(44, make(Material.WHEAT, "§eLoja de plantações", "§7Comprar sementes e boosters."));
+        inventory.setItem(45, TWMenuFrame.backButton());
+        inventory.setItem(49, TWMenuFrame.closeButton());
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     private void setupSelectedSilo() {

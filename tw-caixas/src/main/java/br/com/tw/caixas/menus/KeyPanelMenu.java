@@ -34,14 +34,16 @@ public final class KeyPanelMenu implements TWMenu {
         this.service = service;
         this.openings = openings;
         this.account = account;
-        inventory = Bukkit.createInventory(this, 36, "§8Chaves Virtuais");
+        inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "CHAVES & CAIXAS VIRTUAIS");
         fillBackground();
         for (CrateType type : CrateType.values()) {
             inventory.setItem(type.getMenuSlot(), crateItem(type));
         }
         inventory.setItem(31, forgeItem());
-        inventory.setItem(30, infoItem());
-        TWMenuFrame.apply(inventory);
+        inventory.setItem(4, infoItem());
+        TWMenuFrame.applyDesignSystemBorders(inventory);
+        inventory.setItem(45, TWMenuFrame.backButton());
+        inventory.setItem(49, TWMenuFrame.closeButton());
     }
 
     public static void open(TWCaixasPlugin plugin, CrateService service, CrateOpenings openings, Player player) {
@@ -57,7 +59,12 @@ public final class KeyPanelMenu implements TWMenu {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
-        if (event.getRawSlot() == 31) {
+        int slot = event.getRawSlot();
+        if (slot == 45 || slot == 49) {
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
+            return;
+        }
+        if (slot == 31) {
             player.openInventory(new KeyForgeMenu(plugin, service, player, account).getInventory());
             return;
         }

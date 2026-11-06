@@ -25,7 +25,7 @@ public class CatalogoMenu implements TWMenu {
 
     public CatalogoMenu(Player player) {
         this.player = player;
-        this.inventory = Bukkit.createInventory(this, 54, "§8⚒ Catálogo de Minas");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "CENTRAL DE MINAS");
 
         initWarps();
         setupItems();
@@ -77,17 +77,23 @@ public class CatalogoMenu implements TWMenu {
             }
         }
 
-        inventory.setItem(49, createItem(Material.OAK_DOOR, "§cVoltar", "§7Retornar à Central."));
-        TWMenuFrame.apply(inventory);
+        inventory.setItem(48, createItem(Material.OAK_DOOR, "§eVoltar à Central", "§7Retornar ao menu de mineração."));
+        inventory.setItem(45, TWMenuFrame.backButton());
+        inventory.setItem(49, TWMenuFrame.closeButton());
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     @Override
     public void onClick(InventoryClickEvent event) {
         int slot = event.getSlot();
 
-        if (slot == 49) {
+        if (slot == 48) {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             new MinaMainMenu(player).open();
+            return;
+        }
+        if (slot == 45 || slot == 49) {
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
             return;
         }
 

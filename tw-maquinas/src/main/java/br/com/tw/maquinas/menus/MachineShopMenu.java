@@ -5,6 +5,7 @@ import br.com.tw.core.data.TWUser;
 import br.com.tw.core.menus.TWConfirmationMenu;
 import br.com.tw.core.menus.TWMenu;
 import br.com.tw.core.utils.TWFormat;
+import br.com.tw.core.utils.TWMenuFrame;
 import br.com.tw.maquinas.TWMaquinasPlugin;
 import br.com.tw.maquinas.listeners.MachineListener;
 import br.com.tw.maquinas.managers.MachineManager;
@@ -43,7 +44,7 @@ public class MachineShopMenu implements TWMenu {
         this.player = player;
         this.user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
         this.manager = TWMaquinasPlugin.getInstance().getMachineManager();
-        this.inventory = Bukkit.createInventory(this, 54, ChatColor.DARK_GRAY + "Loja de Máquinas");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "FÁBRICA DE MÁQUINAS");
         setupItems();
     }
 
@@ -87,24 +88,19 @@ public class MachineShopMenu implements TWMenu {
 
         double baseFuelPrice = getBaseFuelPrice();
         long baseFuelUnits = getBaseFuelUnits();
-        inventory.setItem(47, createFuelButton("§e§lCombustível I", baseFuelUnits, baseFuelPrice));
-        inventory.setItem(49, createFuelButton("§6§lCombustível II", fuelBundleUnits(baseFuelUnits, 10),
-                baseFuelPrice * 10.0));
-        inventory.setItem(51, createFuelButton("§c§lCombustível III", fuelBundleUnits(baseFuelUnits, 100),
-                baseFuelPrice * 100.0));
-        inventory.setItem(40, MachineMenuStyle.button(Material.BOOK, "§f§lComo abastecer",
+        inventory.setItem(38, createFuelButton("§e§lCombustível I", baseFuelUnits, baseFuelPrice));
+        inventory.setItem(39, createFuelButton("§6§lCombustível II", fuelBundleUnits(baseFuelUnits, 10), baseFuelPrice * 10.0));
+        inventory.setItem(40, createFuelButton("§c§lCombustível III", fuelBundleUnits(baseFuelUnits, 100), baseFuelPrice * 100.0));
+        inventory.setItem(41, MachineMenuStyle.button(Material.BOOK, "§f§lComo abastecer",
                 "§7Clique com o combustível na máquina.",
                 "§7Segure §eSHIFT §7para usar o stack inteiro."));
 
-        if (pageCount > 1) {
-            inventory.setItem(45, MachineMenuStyle.button(Material.ARROW, "§ePágina anterior"));
+        inventory.setItem(45, (pageCount > 1 && page > 0) ? MachineMenuStyle.button(Material.ARROW, "§ePágina anterior") : TWMenuFrame.backButton());
+        inventory.setItem(49, TWMenuFrame.closeButton());
+        if (pageCount > 1 && page + 1 < pageCount) {
             inventory.setItem(53, MachineMenuStyle.button(Material.ARROW, "§ePróxima página"));
-            inventory.setItem(48, MachineMenuStyle.button(Material.PAPER,
-                    "§fPágina §e" + (page + 1) + "§7/§e" + pageCount));
-        } else {
-            inventory.setItem(48, MachineMenuStyle.button(Material.PAPER, "§f§lLoja de máquinas",
-                    "§7Escolha uma máquina para ver seu custo e produção."));
         }
+        inventory.setItem(48, MachineMenuStyle.button(Material.PAPER, "§fPágina §e" + (page + 1) + "§7/§e" + pageCount, "§7Escolha uma máquina para ver seu custo e produção."));
     }
 
     private ItemStack createFuelButton(String name, long units, double price) {
@@ -137,9 +133,18 @@ public class MachineShopMenu implements TWMenu {
 
         double baseFuelPrice = getBaseFuelPrice();
         long baseFuelUnits = getBaseFuelUnits();
-        if (slot == 47) buyFuel(baseFuelUnits, baseFuelPrice);
-        if (slot == 49) buyFuel(fuelBundleUnits(baseFuelUnits, 10), baseFuelPrice * 10.0);
-        if (slot == 51) buyFuel(fuelBundleUnits(baseFuelUnits, 100), baseFuelPrice * 100.0);
+        if (slot == 38) buyFuel(baseFuelUnits, baseFuelPrice);
+        if (slot == 39) buyFuel(fuelBundleUnits(baseFuelUnits, 10), baseFuelPrice * 10.0);
+        if (slot == 40) buyFuel(fuelBundleUnits(baseFuelUnits, 100), baseFuelPrice * 100.0);
+        if (slot == 45) {
+            if (page > 0) { page--; setupItems(); return; }
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
+            return;
+        }
+        if (slot == 49) {
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
+            return;
+        }
 
         MachineType type = slotMap.get(slot);
         if (type != null) {

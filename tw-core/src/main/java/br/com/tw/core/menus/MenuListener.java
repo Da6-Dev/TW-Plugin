@@ -1,5 +1,7 @@
 package br.com.tw.core.menus;
 
+import br.com.tw.core.utils.TWMenuFrame;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -18,6 +20,13 @@ public class MenuListener implements Listener {
 
             int rawSlot = event.getRawSlot();
             if (rawSlot < 0 || rawSlot >= inv.getSize() || event.getCurrentItem() == null) return;
+
+            if (event.getWhoClicked() instanceof Player) {
+                Player player = (Player) event.getWhoClicked();
+                if (TWMenuFrame.handleNavigationClick(player, rawSlot, inv.getSize())) {
+                    return;
+                }
+            }
 
             // Passa a responsabilidade do clique para a própria classe do menu
             TWMenu menu = (TWMenu) inv.getHolder();

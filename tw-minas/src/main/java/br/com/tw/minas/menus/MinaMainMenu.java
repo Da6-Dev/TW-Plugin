@@ -47,7 +47,7 @@ public class MinaMainMenu implements TWMenu {
 
     public MinaMainMenu(Player player) {
         this.player = player;
-        this.inventory = Bukkit.createInventory(this, 27, ChatColor.AQUA + "§lCentral de Mineração");
+        this.inventory = Bukkit.createInventory(this, 27, TWMenuFrame.PREFIX_TITULO + "CENTRAL DE MINAS");
         setupItems(player);
     }
 
@@ -71,7 +71,7 @@ public class MinaMainMenu implements TWMenu {
         inventory.setItem(15, createItem(Material.GOLD_INGOT, "§e§lRanking",
                 "§7Veja os melhores jogadores do servidor."));
         inventory.setItem(26, getPlayerStatsItem(player));
-        TWMenuFrame.apply(inventory);
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     @Override

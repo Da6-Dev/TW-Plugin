@@ -3,9 +3,10 @@ package br.com.tw.ranks.menus;
 import br.com.tw.core.TWCorePlugin;
 import br.com.tw.core.data.TWUser;
 import br.com.tw.core.menus.TWMenu;
+import br.com.tw.core.utils.TWFormat;
+import br.com.tw.core.utils.TWMenuFrame;
 import br.com.tw.ranks.TWRanksPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -20,7 +21,6 @@ public class RanksMenu implements TWMenu {
     private final Inventory inventory;
     private final Player player;
     private final TWUser user;
-
     private final List<String> rankOrder;
 
     public RanksMenu(Player player) {
@@ -33,7 +33,7 @@ public class RanksMenu implements TWMenu {
                 rankOrder.add(rank);
             }
         }
-        this.inventory = Bukkit.createInventory(this, 54, ChatColor.DARK_GRAY + "Árvore de Evolução");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "TRILHA DE RANKS");
         setupItems();
     }
 
@@ -42,38 +42,76 @@ public class RanksMenu implements TWMenu {
         String currentRank = user.getRankId();
         int currentIndex = currentRank.equalsIgnoreCase("MAX") ? 999 : rankOrder.indexOf(currentRank.toUpperCase());
 
-        // Desenha a linha do tempo (Slots 10 a 16, 19 a 25, etc)
-        int[] slots = {10, 11, 12, 13, 14, 15, 16, 28, 29, 30};
+        // Cabeçalho de Perfil no Slot 4
+        inventory.setItem(4, createItem(Material.NETHER_STAR, "§b§lSEU PROGRESSO",
+                "§7Acompanhe o seu avanço na trilha de ranks.",
+                "",
+                "§7Rank Atual: §a" + currentRank,
+                "§7Saldo: §e$" + TWFormat.formatarDinheiro(user.getBalance()),
+                "",
+                "§8TW Network • Ranks"));
 
-        for (int i = 0; i < rankOrder.size(); i++) {
+        // Desenha a trilha nos slots das linhas 2 e 3
+        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
+
+        for (int i = 0; i < rankOrder.size() && i < slots.length; i++) {
             String rankName = rankOrder.get(i);
             int slot = slots[i];
 
             if (i < currentIndex) {
-                // Ranks já passados (Vidro Verde)
-                inventory.setItem(slot, createItem(Material.LIME_STAINED_GLASS_PANE, "§a§l" + rankName, "§7Rank já desbloqueado!"));
+                inventory.setItem(slot, createItem(Material.LIME_STAINED_GLASS_PANE, "§a§l" + rankName + " §a✔",
+                        "§7Rank já desbloqueado anteriormente.",
+                        "",
+                        "§7Status: §aConcluído",
+                        "",
+                        "§a▶ Nível superado"));
             } else if (i == currentIndex) {
-                // Rank Atual (Destaque)
-                inventory.setItem(slot, createItem(Material.EMERALD_BLOCK, "§e§l" + rankName, "§7Este é o teu rank atual."));
+                inventory.setItem(slot, createItem(Material.EMERALD_BLOCK, "§e§l" + rankName + " §6★",
+                        "§7Este é o teu rank atual em atividade.",
+                        "",
+                        "§7Status: §eEm Progresso",
+                        "",
+                        "§e▶ Rank Atual"));
             } else {
-                // Próximos Ranks (Vidro Vermelho)
                 double cost = TWRanksPlugin.getInstance().getRanksConfig().getDouble("ranks." + rankOrder.get(i - 1) + ".cost");
-                inventory.setItem(slot, createItem(Material.RED_STAINED_GLASS_PANE, "§c§l" + rankName, "§7Custo: §a$" + String.format("%,.2f", cost), "§cBloqueado."));
+                inventory.setItem(slot, createItem(Material.RED_STAINED_GLASS_PANE, "§c§l" + rankName + " §c🔒",
+                        "§7Requer completar os ranks anteriores.",
+                        "",
+                        "§7Custo: §e$" + String.format("%,.2f", cost),
+                        "§7Status: §cBloqueado",
+                        "",
+                        "§c▶ Requisito não atingido"));
             }
         }
 
-        // Botão de Ação Inferior Central
-        inventory.setItem(49, createItem(Material.EXPERIENCE_BOTTLE, "§a§lEVOLUIR (RANKUP)", "§7Clica aqui para subir de rank."));
-        inventory.setItem(50, createItem(Material.GOLD_BLOCK, "§e§lEVOLUÇÃO MAX", "§7Clica aqui para dar rankup", "§7o máximo que conseguires."));
+        // Botões de Ação no centro da Linha 4
+        inventory.setItem(31, createItem(Material.EXPERIENCE_BOTTLE, "§a§lEVOLUIR (RANKUP)",
+                "§7Evolui para o próximo rank da lista.",
+                "",
+                "§7Rank Atual: §a" + currentRank,
+                "§7Saldo: §e$" + TWFormat.formatarDinheiro(user.getBalance()),
+                "",
+                "§a▶ Clique para subir de rank"));
+
+        inventory.setItem(32, createItem(Material.GOLD_BLOCK, "§e§lEVOLUÇÃO MAX",
+                "§7Compra o máximo de ranks possíveis",
+                "§7de acordo com o teu saldo disponível.",
+                "",
+                "§7Modo: §6Automático",
+                "",
+                "§e▶ Clique para dar rankup max"));
+
+        // Molduras e navegação padronizadas (Design System)
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     @Override
     public void onClick(InventoryClickEvent event) {
         int slot = event.getSlot();
-        if (slot == 49) {
+        if (slot == 31) {
             player.closeInventory();
             player.performCommand(user.getRankId().equalsIgnoreCase("MAX") ? "prestigio" : "rankup");
-        } else if (slot == 50) {
+        } else if (slot == 32) {
             player.closeInventory();
             player.performCommand("rankupmax");
         }
@@ -86,9 +124,11 @@ public class RanksMenu implements TWMenu {
     private ItemStack createItem(Material mat, String name, String... lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
-        meta.setLore(Arrays.asList(lore));
-        item.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(Arrays.asList(lore));
+            item.setItemMeta(meta);
+        }
         return item;
     }
 }

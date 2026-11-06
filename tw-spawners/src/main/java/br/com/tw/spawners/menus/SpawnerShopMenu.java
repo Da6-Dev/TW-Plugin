@@ -38,7 +38,7 @@ public class SpawnerShopMenu implements TWMenu {
         this.player = player;
         this.user = TWCorePlugin.getInstance().getUserManager().getUser(player.getUniqueId());
         this.manager = TWSpawnersPlugin.getInstance().getSpawnerManager();
-        this.inventory = Bukkit.createInventory(this, 54, ChatColor.DARK_GRAY + "Loja de Geradores");
+        this.inventory = Bukkit.createInventory(this, 54, TWMenuFrame.PREFIX_TITULO + "MERCADO DE SPAWNERS");
         setupItems();
     }
 
@@ -78,10 +78,11 @@ public class SpawnerShopMenu implements TWMenu {
         inventory.setItem(40, createBoosterButton("§aBooster Médio §7(2.0x)", 2.0, 60, 1000000.0));
         inventory.setItem(42, createBoosterButton("§dBooster Divino §7(3.0x)", 3.0, 60, 5000000.0));
         inventory.setItem(4, createInfoButton(page, pageCount));
-        if (page > 0) inventory.setItem(45, createNavigationButton("§ePágina anterior"));
+        inventory.setItem(45, (page > 0) ? createNavigationButton("§ePágina anterior") : TWMenuFrame.backButton());
+        inventory.setItem(49, TWMenuFrame.closeButton());
         if (page + 1 < pageCount) inventory.setItem(53, createNavigationButton("§ePróxima página"));
-        if (pageCount > 1) inventory.setItem(49, createNavigationButton("§fPágina §e" + (page + 1) + "§7/§e" + pageCount));
-        TWMenuFrame.apply(inventory);
+        if (pageCount > 1) inventory.setItem(48, createNavigationButton("§fPágina §e" + (page + 1) + "§7/§e" + pageCount));
+        TWMenuFrame.applyDesignSystemBorders(inventory);
     }
 
     private ItemStack createInfoButton(int currentPage, int pageCount) {
@@ -127,9 +128,13 @@ public class SpawnerShopMenu implements TWMenu {
     public void onClick(InventoryClickEvent event) {
         if (user == null) return;
         int slot = event.getRawSlot();
-        if (slot == 45 && page > 0) {
-            page--;
-            setupItems();
+        if (slot == 45) {
+            if (page > 0) { page--; setupItems(); return; }
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
+            return;
+        }
+        if (slot == 49) {
+            TWMenuFrame.handleNavigationClick(player, slot, 54);
             return;
         }
         if (slot == 53) {
